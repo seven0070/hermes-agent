@@ -18784,15 +18784,6 @@ def start_server(
             # without it the operator would only see "no providers" which
             # is misleading when the provider IS installed but unconfigured.
             skip_reasons: list[str] = []
-            try:
-                from plugins.dashboard_auth import nous as _nous_plugin
-
-                if _nous_plugin.LAST_SKIP_REASON:
-                    skip_reasons.append(
-                        f"  • nous: {_nous_plugin.LAST_SKIP_REASON}"
-                    )
-            except Exception:
-                pass
 
             _fix_hint = (
                 "Configure an auth provider before exposing the dashboard:\n"
@@ -18801,8 +18792,7 @@ def start_server(
                 "    (hash with: python -c \"from "
                 "plugins.dashboard_auth.basic import hash_password; "
                 "print(hash_password('your-password'))\")\n"
-                "  • OAuth: run `hermes dashboard register` (Nous Portal) or "
-                "install a DashboardAuthProvider plugin.\n"
+                "  • OAuth: install a DashboardAuthProvider plugin.\n"
                 "There is no unauthenticated public-bind option — to keep it "
                 "local, bind 127.0.0.1 and tunnel in (SSH / Tailscale)."
             )

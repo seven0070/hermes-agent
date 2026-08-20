@@ -7012,6 +7012,42 @@ def logout_command(args) -> None:
         print(f"No auth state found for {provider_name}.")
 
 
+def resolve_nous_access_token(*_args: Any, **_kwargs) -> Optional[str]:
+    """Nous OAuth refresh was removed — return the stored token, unrefreshed.
+
+    The managed tool gateway stores its long-lived bearer in the auth store;
+    this keeps read paths working while refresh-dependent flows degrade.
+    """
+    try:
+        state = get_provider_auth_state("nous") or {}
+        tokens = state.get("tokens") or {}
+        token = str(tokens.get("access_token") or "").strip()
+        return token or None
+    except Exception:
+        return None
+
+
+def resolve_nous_runtime_credentials(*_args: Any, **_kwargs) -> dict:
+    """Nous OAuth refresh was removed — surface only a stored token."""
+    token = resolve_nous_access_token()
+    return {"api_key": token} if token else {}
+
+
+def refresh_nous_oauth_from_state(*_args: Any, **_kwargs):
+    """Nous Portal login was removed in this build."""
+    raise AuthError("Nous Portal login was removed in this build.")
+
+
+def persist_nous_credentials(*_args: Any, **_kwargs) -> None:
+    """Nous Portal login was removed — nothing to persist."""
+    return None
+
+
+def invalidate_nous_auth_status_cache() -> None:
+    """Nous Portal was removed — no auth-status cache to invalidate."""
+    return None
+
+
 # ── Nous OAuth helpers (tombstones) ──────────────────────────────────────────
 # The Nous Portal OAuth flow was removed with the Nous integration. The
 # credential pool still calls these for legacy "nous" pool entries; they are
