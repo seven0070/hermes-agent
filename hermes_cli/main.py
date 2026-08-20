@@ -4554,14 +4554,6 @@ def _prompt_provider_choice(choices, *, default=0, title="Select provider:"):
             return None
 
 
-
-
-
-
-
-
-
-
 _DEFAULT_QWEN_PORTAL_MODELS = [
     "qwen3-coder-plus",
     "qwen3-coder",
@@ -4754,8 +4746,6 @@ def _save_custom_provider(
     print(f'  💾 Saved to custom providers as "{name}" (edit in config.yaml)')
 
 
-
-
 def _remove_custom_provider(config):
     """Let the user remove a saved custom provider from config.yaml."""
     from hermes_cli.config import load_config, save_config
@@ -4812,8 +4802,6 @@ def _remove_custom_provider(config):
         removed.get("name", "unnamed") if isinstance(removed, dict) else str(removed)
     )
     print(f'✅ Removed "{removed_name}" from custom providers.')
-
-
 
 
 # Lazy-export the model catalog at module level. Tests and a handful of
@@ -5096,10 +5084,6 @@ def _prompt_reasoning_effort_selection(efforts, current_effort=""):
             return None
 
 
-
-
-
-
 def _prompt_api_key(
     pconfig,
     existing_key: str,
@@ -5194,8 +5178,6 @@ def _prompt_api_key(
     return existing_key, False
 
 
-
-
 def _infer_stepfun_region(base_url: str) -> str:
     """Infer the current StepFun region from the configured endpoint."""
     normalized = (base_url or "").strip().lower()
@@ -5215,14 +5197,6 @@ def _stepfun_base_url_for_region(region: str) -> str:
         if region == "china"
         else STEPFUN_STEP_PLAN_INTL_BASE_URL
     )
-
-
-
-
-
-
-
-
 
 
 def _run_anthropic_oauth_flow(save_env_value):
@@ -5316,8 +5290,6 @@ def _run_anthropic_oauth_flow(save_env_value):
             return True
         print("  Cancelled — install Claude Code and try again.")
         return False
-
-
 
 
 def cmd_login(args):
@@ -7694,7 +7666,6 @@ def _desktop_linux_sandbox_helper_is_regular_file(packaged_executable: Path) -> 
     except OSError:
         return False
     return stat.S_ISREG(sandbox_lstat.st_mode)
-
 
 
 def _desktop_linux_sandbox_fixup(packaged_executable: Path) -> bool:
@@ -11011,7 +10982,6 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
     print()
     print("  How do you want to authenticate the dashboard?")
     print("    [1] Username & password (quickest; for a trusted LAN / VPN)")
-    print("    [2] OAuth via Nous Portal (run `hermes dashboard register`)")
     print("    [3] Cancel")
     print()
 
@@ -11026,7 +10996,6 @@ def _maybe_setup_dashboard_auth_interactively(args) -> None:
         print(
             "  Run this on the host where the dashboard lives, then start "
             "the dashboard again:\n"
-            "    hermes dashboard register\n"
             "  It provisions a Nous Portal OAuth client and writes "
             "HERMES_DASHBOARD_OAUTH_CLIENT_ID into ~/.hermes/.env for you.\n"
             "  Docs: https://hermes-agent.nousresearch.com/docs/"
@@ -11538,13 +11507,6 @@ def cmd_dashboard(args):
         ssh_session_token=_ssh_session_token,
         ssh_owner_nonce=_ssh_owner_nonce,
     )
-
-
-def cmd_dashboard_register(args):
-    """Register a self-hosted dashboard OAuth client with Nous Portal."""
-    from hermes_cli.dashboard_register import cmd_dashboard_register as _impl
-
-    _impl(args)
 
 
 def cmd_gateway_enroll(args):
@@ -13783,7 +13745,6 @@ def main():
     build_dashboard_parser(
         subparsers,
         cmd_dashboard=cmd_dashboard,
-        cmd_dashboard_register=cmd_dashboard_register,
     )
 
 
