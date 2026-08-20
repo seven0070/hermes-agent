@@ -586,20 +586,7 @@ def _is_nous_portal_endpoint(base_url: str | None) -> bool:
     Lookalikes such as ``inference-api.nousresearch.com.attacker.test`` are
     rejected (hostname match, not substring).
     """
-    if base_url_host_matches(base_url or "", "inference-api.nousresearch.com"):
-        return True
-    try:
-        from hermes_cli.auth import _nous_inference_env_override
-
-        override = _nous_inference_env_override()
-    except Exception:
-        return False
-    if not override:
-        return False
-    # Exact host equality (not subdomain) so the env override can't broaden
-    # into sibling hosts the operator did not set.
-    override_host = base_url_hostname(override)
-    return bool(override_host) and base_url_hostname(base_url or "") == override_host
+    return base_url_host_matches(base_url or "", "inference-api.nousresearch.com")
 
 
 def _requires_bearer_auth(base_url: str | None) -> bool:

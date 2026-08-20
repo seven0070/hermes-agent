@@ -253,7 +253,7 @@ class TestDefaultModelFromCache:
 
 
     def test_shipped_manifest_labels_glm52_default(self, isolated_home):
-        """Contract with the in-repo manifest: both provider blocks label the
+        """Contract with the in-repo manifest: provider blocks label the
         same default entry the code constant points at."""
         import hermes_cli.model_catalog as model_catalog
         from hermes_cli.models import PREFERRED_SILENT_DEFAULT_MODEL
@@ -262,7 +262,7 @@ class TestDefaultModelFromCache:
         manifest = json.loads(
             (repo_root / "website" / "static" / "api" / "model-catalog.json").read_text()
         )
-        for provider in ("openrouter", "nous"):
+        for provider in ("openrouter",):
             block = manifest["providers"][provider]
             labeled = [m["id"] for m in block["models"] if m.get("default")]
             assert labeled == [PREFERRED_SILENT_DEFAULT_MODEL], (
@@ -309,128 +309,6 @@ class TestProviderOverride:
 
 class TestIntegrationWithModelsModule:
     """Exercise the fallback paths via the real callers in hermes_cli.models."""
-
-
-
-    def test_picker_nous_row_uses_curated_list(self, tmp_path, monkeypatch):
-        """The /model picker surfaces the curated ``_PROVIDER_MODELS["nous"]``
-        list in curated order — matching the ``hermes model`` CLI — not the live
-        ``/v1/models`` catalog or the manifest. Portal free/paid recommendations
-        are unioned in when reachable; offline (as here, with the Portal calls
-        stubbed out) it's exactly the curated list.
-        """
-        # We deliberately do NOT use the ``isolated_home`` fixture here:
-        # that fixture monkeypatches ``Path.home`` to ``tmp_path``, which
-        # trips the auth-store seat-belt in ``_auth_file_path()`` because
-        # ``HERMES_HOME / auth.json`` then resolves to the same path the
-        # seat-belt thinks is the "real" user store. Use the autouse
-        # ``_hermetic_environment`` HERMES_HOME directly instead.
-        import importlib
-        from hermes_cli import model_catalog
-        from hermes_cli.models import get_curated_nous_model_ids
-        importlib.reload(model_catalog)
-        try:
-            from hermes_cli.model_switch import list_picker_providers
-
-            active_home = Path(os.environ["HERMES_HOME"])
-            (active_home / "auth.json").write_text(
-                json.dumps(
-                    {
-                        "providers": {"nous": {"access_token": "fake"}},
-                        "credential_pool": {},
-                    }
-                )
-            )
-
-            # Stub the Portal recommendation union so the row is deterministic
-            # (the curated list alone) and never touches the network. ``expected``
-            # is computed from the same source the picker uses internally
-            # (``curated["nous"] = get_curated_nous_model_ids()``), so the test
-            # stays an invariant — it can't rot as the curated/manifest list grows.
-            with patch.object(
-                model_catalog, "_fetch_manifest", return_value=_valid_manifest()
-            ), patch("hermes_cli.models.check_nous_free_tier", return_value=False), patch(
-                "hermes_cli.models.union_with_portal_free_recommendations",
-                side_effect=lambda ids, *a, **k: (ids, {}),
-            ), patch(
-                "hermes_cli.models.union_with_portal_paid_recommendations",
-                side_effect=lambda ids, *a, **k: (ids, {}),
-            ):
-                expected = get_curated_nous_model_ids()
-                picker = list_picker_providers(
-                    current_provider="nous", max_models=99
-                )
-        finally:
-            model_catalog.reset_cache()
-
-        nous_row = next((r for r in picker if r["slug"] == "nous"), None)
-        assert nous_row is not None, "nous row must appear when authed"
-        assert nous_row["models"] == expected
-
-    def test_picker_max_models_cap_semantics(self, tmp_path, monkeypatch):
-        """The cap argument has three distinct meanings on the real slicing
-        path: ``None`` = unlimited (the cap-removal fix, #48297), ``0`` = no
-        models (preserved for slug-only callers), an int N = first N. Guards
-        the ``is not None`` distinction the cap-removal follow-up introduced —
-        a ``if max_models`` (falsy) check would conflate ``0`` with unlimited.
-        """
-        import importlib
-        from hermes_cli import model_catalog
-        from hermes_cli.models import get_curated_nous_model_ids
-        importlib.reload(model_catalog)
-        try:
-            from hermes_cli.model_switch import (
-                list_authenticated_providers,
-                list_picker_providers,
-            )
-
-            active_home = Path(os.environ["HERMES_HOME"])
-            (active_home / "auth.json").write_text(
-                json.dumps(
-                    {
-                        "providers": {"nous": {"access_token": "fake"}},
-                        "credential_pool": {},
-                    }
-                )
-            )
-            with patch.object(
-                model_catalog, "_fetch_manifest", return_value=_valid_manifest()
-            ), patch("hermes_cli.models.check_nous_free_tier", return_value=False), patch(
-                "hermes_cli.models.union_with_portal_free_recommendations",
-                side_effect=lambda ids, *a, **k: (ids, {}),
-            ), patch(
-                "hermes_cli.models.union_with_portal_paid_recommendations",
-                side_effect=lambda ids, *a, **k: (ids, {}),
-            ):
-                expected = get_curated_nous_model_ids()
-                full = list_picker_providers(current_provider="nous", max_models=None)
-                one = list_picker_providers(current_provider="nous", max_models=1)
-                # 0 is exercised on list_authenticated_providers (the slug-only
-                # path); the picker variant drops empty-model rows entirely, so
-                # the empty-list contract lives on the auth-providers call.
-                zero = list_authenticated_providers(
-                    current_provider="nous", max_models=0
-                )
-        finally:
-            model_catalog.reset_cache()
-
-        def _nous(rows):
-            return next((r for r in rows if r["slug"] == "nous"), None)
-
-        # Only meaningful when the curated list actually exceeds 1 entry.
-        assert len(expected) > 1, "test needs a multi-model curated nous list"
-
-        full_row = _nous(full)
-        assert full_row is not None and full_row["models"] == expected
-
-        one_row = _nous(one)
-        assert one_row is not None and one_row["models"] == expected[:1]
-
-        zero_row = _nous(zero)
-        # 0 means an empty model list — NOT unlimited. total_models still real.
-        assert zero_row is not None
-        assert zero_row["models"] == []
-        assert zero_row["total_models"] == len(expected)
 
 
 # -----------------------------------------------------------------------------

@@ -3767,20 +3767,6 @@ async def get_status(profile: Optional[str] = None):
             pass
 
         # Nous bootstrap-session validity for the NAS health sweep. A hosted
-        # agent whose Nous auth dies terminally (invalid_grant / quarantine)
-        # looks HEALTHY to every liveness/connectivity probe — the machine,
-        # relay, and this dashboard all stay up — yet every inference turn
-        # fails. This is the ONLY signal that surfaces that condition, and it
-        # is determinable with no working token (local auth-store state). NAS
-        # re-mints the bootstrap session when it reads "terminal". Best-effort:
-        # never let auth classification break the public liveness probe.
-        nous_session_valid = "unknown"
-        try:
-            from hermes_cli.auth import get_nous_session_validity
-            nous_session_valid = get_nous_session_validity()
-        except Exception:
-            nous_session_valid = "unknown"
-
         # Always-public liveness + auth-gate shape. Safe for external uptime
         # probes (NAS's wildcard-subdomain liveness probe), the SPA's pre-login
         # bootstrap, and anyone who can curl the host — i.e. exactly the audience
@@ -3804,7 +3790,6 @@ async def get_status(profile: Optional[str] = None):
             "auth_required": auth_required,
             "auth_providers": auth_providers,
             "auth_flows": auth_flows,
-            "nous_session_valid": nous_session_valid,
         }
 
         # Stable per-install identity (see get_install_id above). First call
@@ -4229,44 +4214,16 @@ async def get_portal_status():
 
 
 def _get_portal_status_sync():
+    """Portal status endpoint — Nous Portal integration removed from this build."""
     cfg = load_config() or {}
-    auth: Dict[str, Any] = {}
-    try:
-        from hermes_cli.auth import get_nous_auth_status_local
-
-        # Read-only dashboard endpoint: refresh-free snapshot so polling
-        # never performs an OAuth refresh or burns a refresh token.
-        auth = get_nous_auth_status_local() or {}
-    except Exception:
-        auth = {}
-
-    features = []
-    try:
-        from hermes_cli.nous_subscription import get_nous_subscription_features
-
-        feats = get_nous_subscription_features(cfg)
-        if feats is not None:
-            for feat in feats.items():
-                if getattr(feat, "managed_by_nous", False):
-                    state = "via Nous Portal"
-                elif getattr(feat, "active", False) and getattr(feat, "current_provider", None):
-                    state = feat.current_provider
-                elif getattr(feat, "active", False):
-                    state = "active"
-                else:
-                    state = "not configured"
-                features.append({"label": getattr(feat, "label", ""), "state": state})
-    except Exception:
-        _log.exception("portal features failed")
-
     model_cfg = cfg.get("model") if isinstance(cfg.get("model"), dict) else {}
     return {
-        "logged_in": bool(auth.get("logged_in")),
-        "portal_url": auth.get("portal_base_url"),
-        "inference_url": auth.get("inference_base_url"),
+        "logged_in": False,
+        "portal_url": None,
+        "inference_url": None,
         "provider": str((model_cfg or {}).get("provider") or ""),
-        "subscription_url": "https://portal.nousresearch.com/manage-subscription",
-        "features": features,
+        "subscription_url": None,
+        "features": [],
     }
 
 
@@ -7056,49 +7013,7 @@ def get_recommended_default_model(provider: str = ""):
     """
     slug = (provider or "").strip().lower()
 
-    if slug == "nous":
-        try:
-            from hermes_cli.models import (
-                get_curated_nous_model_ids,
-                get_pricing_for_provider,
-                check_nous_free_tier,
-                partition_nous_models_by_tier,
-                pick_silent_default_model,
-                union_with_portal_free_recommendations,
-                union_with_portal_paid_recommendations,
-            )
-            from hermes_cli.auth import get_provider_auth_state
-
-            model_ids = get_curated_nous_model_ids()
-            pricing = get_pricing_for_provider("nous") or {}
-            free_tier = check_nous_free_tier(force_fresh=True)
-
-            portal_url = ""
-            try:
-                state = get_provider_auth_state("nous") or {}
-                portal_url = state.get("portal_base_url", "") or ""
-            except Exception:
-                portal_url = ""
-
-            if free_tier:
-                model_ids, pricing = union_with_portal_free_recommendations(
-                    model_ids, pricing, portal_url
-                )
-                model_ids, _unavailable = partition_nous_models_by_tier(
-                    model_ids, pricing, free_tier=True
-                )
-            else:
-                model_ids, pricing = union_with_portal_paid_recommendations(
-                    model_ids, pricing, portal_url
-                )
-
-            model = pick_silent_default_model(model_ids, provider="nous")
-            return {"provider": "nous", "model": model, "free_tier": bool(free_tier)}
-        except Exception:
-            _log.exception("GET /api/model/recommended-default (nous) failed")
-            return {"provider": "nous", "model": "", "free_tier": None}
-
-    # Non-Nous: preferred silent default when the provider's curated list
+    # Preferred silent default when the provider's curated list
     # carries it, else the first curated model. Aggregator lists lead with the
     # priciest Anthropic flagship (claude-fable-5), which must never be the
     # model a user lands on without explicitly picking it.
@@ -7347,32 +7262,7 @@ def _apply_model_assignment_sync(
 
         # When switching the main provider to Nous, mirror the CLI's
         # post-model-selection behaviour (hermes_cli/main.py
-        # prompt_enable_tool_gateway / tools_config apply_nous_managed_defaults):
-        # auto-route any *unconfigured* tools through the Nous Tool Gateway.
-        # This is purely additive — apply_nous_managed_defaults skips every
-        # tool where the user already has a direct key (FIRECRAWL_API_KEY,
-        # FAL_KEY, etc.) or an explicit backend/provider in config, so it
-        # never overwrites a user's own setup. GUI users thus land on the
-        # gateway the same way CLI users do, without a separate prompt.
         gateway_tools: list[str] = []
-        if provider.strip().lower() == "nous":
-            try:
-                from hermes_cli.nous_subscription import apply_nous_managed_defaults
-                from hermes_cli.tools_config import _get_platform_tools
-
-                enabled = _get_platform_tools(
-                    cfg, "cli", include_default_mcp_servers=False
-                )
-                changed = apply_nous_managed_defaults(
-                    cfg,
-                    enabled_toolsets=enabled,
-                    force_fresh=True,
-                )
-                gateway_tools = sorted(changed)
-            except Exception:
-                # Portal lookup hiccups / non-subscriber / non-nous gating
-                # must never block saving the model assignment.
-                _log.debug("apply_nous_managed_defaults skipped", exc_info=True)
 
         save_config(cfg)
 
@@ -10508,14 +10398,6 @@ def _copilot_acp_status() -> Dict[str, Any]:
 # CLI like Claude Code or Qwen).
 _OAUTH_PROVIDER_CATALOG: tuple[Dict[str, Any], ...] = (
     {
-        "id": "nous",
-        "name": "Nous Portal",
-        "flow": "device_code",
-        "cli_command": "hermes auth add nous",
-        "docs_url": "https://portal.nousresearch.com",
-        "status_fn": None,  # dispatched via auth.get_nous_auth_status
-    },
-    {
         "id": "openai-codex",
         "name": "ChatGPT or Codex Subscription",
         "flow": "device_code",
@@ -10594,18 +10476,6 @@ def _resolve_provider_status(provider_id: str, status_fn) -> Dict[str, Any]:
             return {"logged_in": False, "error": str(e)}
     try:
         from hermes_cli import auth as hauth
-        if provider_id == "nous":
-            # Read-only accounts-tab card: refresh-free snapshot so listing
-            # providers never performs an OAuth refresh.
-            raw = hauth.get_nous_auth_status_local()
-            return {
-                "logged_in": bool(raw.get("logged_in")),
-                "source": "nous_portal",
-                "source_label": raw.get("portal_base_url") or "Nous Portal",
-                "token_preview": _truncate_token(raw.get("access_token")),
-                "expires_at": raw.get("access_expires_at"),
-                "has_refresh_token": bool(raw.get("has_refresh_token")),
-            }
         if provider_id == "openai-codex":
             raw = hauth.get_codex_auth_status()
             return {
@@ -18881,13 +18751,6 @@ def start_server(
     apply_nofile_soft_limit()
 
     import uvicorn
-
-    try:
-        from hermes_cli.nous_auth_keepalive import start_nous_auth_keepalive
-
-        start_nous_auth_keepalive()
-    except Exception as exc:
-        _log.debug("Nous auth keepalive did not start: %s", exc)
 
     # Phase 0: stash the auth-gate flag on app.state so middleware / SPA-token
     # injection / WS-auth paths can branch on it consistently.  Phase 3.5

@@ -1,4 +1,9 @@
-"""Centralized Nous Portal request tags.
+"""Shared conversation-context helpers.
+
+Formerly also built the Nous Portal product-attribution tags; that tag
+builder was removed together with the Nous Portal integration (the
+``hermes_client_tag``/``conversation_tag`` helpers remain for any
+custom integration that wants the same shape).
 
 Every Hermes request that hits the Nous Portal — main agent loop, auxiliary
 client (compression / titles / vision / web_extract / session_search / etc.),
@@ -115,30 +120,3 @@ def conversation_tag(session_id: str) -> str:
     available — never as part of the always-on base tag set.
     """
     return f"conversation={session_id}"
-
-
-def nous_portal_tags(session_id: str | None = None) -> List[str]:
-    """Return the canonical list of Nous Portal product tags.
-
-    Always returns a fresh list so callers can mutate it freely
-    (e.g. ``merged_extra.setdefault("tags", []).extend(nous_portal_tags())``).
-
-    When ``session_id`` is provided, a ``conversation=<session_id>`` tag is
-    appended so Portal usage can be attributed to a specific Hermes
-    conversation. When it is omitted, the ambient conversation context
-    (``set_conversation_context``, published by the agent loop at turn
-    entry) is used instead — this is how auxiliary calls (compression,
-    titles, vision, MoA slots, ...) inherit the conversation tag without
-    per-call-site plumbing. Callers outside any conversation (e.g. the
-    auxiliary client's import-time base tags) get the canonical two-tag set.
-    """
-    tags = ["product=hermes-agent", hermes_client_tag()]
-    # Ambient context first: the agent loop publishes the lineage ROOT id
-    # (stable across context-compression rotation and delegate subagent
-    # trees), which is the better conversation key than a per-segment
-    # session_id passed explicitly. The explicit argument remains as a
-    # fallback for callers running outside any agent turn.
-    effective = get_conversation_context() or session_id
-    if effective:
-        tags.append(conversation_tag(effective))
-    return tags

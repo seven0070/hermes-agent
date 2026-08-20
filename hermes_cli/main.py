@@ -797,7 +797,6 @@ from hermes_cli import __version__, __release_date__
 from hermes_cli.model_setup_flows import (
     _prompt_auth_credentials_choice,
     _model_flow_openrouter,
-    _model_flow_nous,
     _model_flow_openai_codex,
     _model_flow_xai_oauth,
     _model_flow_qwen_oauth,
@@ -3948,8 +3947,6 @@ def select_provider_and_model(args=None):
         _model_flow_moa(config, current_model)
     elif selected_provider == "ai-gateway":
         _model_flow_ai_gateway(config, current_model)
-    elif selected_provider == "nous":
-        _model_flow_nous(config, current_model, args=args)
     elif selected_provider == "openai-codex":
         _model_flow_openai_codex(config, current_model)
     elif selected_provider == "xai-oauth":
@@ -11638,7 +11635,7 @@ _BUILTIN_SUBCOMMANDS = frozenset(
         "dump", "egress", "fallback", "gateway", "hooks", "import", "import-agent", "insights",
         "gui", "desktop", "kanban", "login", "logout", "logs", "lsp", "mcp", "memory", "migrate", "moa",
         "journey", "memory-graph", "learning",
-        "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "portal", "profile",
+        "model", "monitoring", "pairing", "pause", "peer", "pets", "plugins", "profile",
         "project", "proxy",
         "prompt-size",
         "resume",
@@ -12728,12 +12725,6 @@ def main():
     from hermes_cli.subcommands.peer import build_peer_parser
 
     build_peer_parser(subparsers)
-
-    # =========================================================================
-    # portal command — Nous Portal status + Tool Gateway routing
-    # =========================================================================
-    from hermes_cli.portal_cli import add_parser as _add_portal_parser
-    _add_portal_parser(subparsers)
 
     # =========================================================================
     # kanban command — multi-profile collaboration board

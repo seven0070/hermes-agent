@@ -34,11 +34,6 @@ def _clear_terminal_env(monkeypatch):
     ]
     for key in keys:
         monkeypatch.delenv(key, raising=False)
-    # Default: no Nous subscription — patch both the terminal_tool local
-    # binding and tool_backend_helpers (used by resolve_modal_backend_state).
-    monkeypatch.setattr(terminal_tool_module, "managed_nous_tools_enabled", lambda: False)
-    import tools.tool_backend_helpers as _tbh
-    monkeypatch.setattr(_tbh, "managed_nous_tools_enabled", lambda: False)
 
 
 def test_local_terminal_requirements(monkeypatch, caplog):
@@ -67,7 +62,7 @@ def test_unknown_terminal_env_logs_error_and_returns_false(monkeypatch, caplog):
     )
 
 
-def test_modal_backend_managed_mode_without_feature_flag_logs_clear_error(monkeypatch, caplog, tmp_path):
+def test_modal_backend_managed_mode_without_gateway_logs_clear_error(monkeypatch, caplog, tmp_path):
     _clear_terminal_env(monkeypatch)
     monkeypatch.setenv("TERMINAL_ENV", "modal")
     monkeypatch.setenv("TERMINAL_MODAL_MODE", "managed")
@@ -80,7 +75,7 @@ def test_modal_backend_managed_mode_without_feature_flag_logs_clear_error(monkey
 
     assert ok is False
     assert any(
-        "Nous Tool Gateway access is not currently available" in record.getMessage()
+        "managed tool gateway is unavailable" in record.getMessage()
         for record in caplog.records
     )
 

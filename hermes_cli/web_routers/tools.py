@@ -62,7 +62,7 @@ async def get_toolsets(profile: Optional[str] = None):
         _get_platform_tools,
         _toolset_configuration_platform,
         _toolset_has_keys,
-        get_nous_subscription_features,
+        get_tool_subscription_features,
         gui_toolset_label,
     )
     from hermes_cli.platforms import platform_label
@@ -83,7 +83,7 @@ async def get_toolsets(profile: Optional[str] = None):
                 )
                 for platform in target_platforms
             }
-            features = get_nous_subscription_features(config)
+            features = get_tool_subscription_features(config)
         return config, toolset_rows, enabled_by_platform, features
 
     config, toolset_rows, enabled_by_platform, features = await asyncio.to_thread(_read)
@@ -244,7 +244,7 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
         web_provider_capabilities,
     )
     from hermes_cli.config import get_env_value
-    from hermes_cli.nous_subscription import get_nous_subscription_features
+    from hermes_cli.tool_features import get_tool_subscription_features
 
     valid = {ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()}
     if name not in valid:
@@ -262,7 +262,7 @@ async def get_toolset_config(name: str, profile: Optional[str] = None):
                 # Fetch portal/entitlement state once for the whole matrix — the
                 # per-provider readiness computation below reuses it instead of
                 # re-probing per row.
-                features = get_nous_subscription_features(config, force_fresh=True)
+                features = get_tool_subscription_features(config, force_fresh=True)
                 for prov in _visible_providers(cat, config, force_fresh=True):
                     env_vars = [
                         {
@@ -496,10 +496,6 @@ async def select_toolset_provider(
         _get_effective_configurable_toolsets,
         _visible_providers,
     )
-    from hermes_cli.nous_subscription import (
-        MANAGED_FEATURE_COVERAGE_CATEGORY,
-        get_nous_subscription_features,
-    )
 
     valid = {ts_key for ts_key, _, _ in _get_effective_configurable_toolsets()}
     if name not in valid:
@@ -560,40 +556,6 @@ async def select_toolset_provider(
                 if body.capability is not None:
                     response["capability"] = body.capability
 
-            # Entitlement check for managed Nous rows — mirrors the gate the CLI
-            # applies via ensure_nous_portal_access at selection time. This hits
-            # the network (Portal), so it runs AFTER releasing the mutation lock:
-            # holding a process-wide config-write lock across a network fetch
-            # would stall every other config writer behind a slow Portal call.
-            # Still inside the worker thread + profile scope.
-            cat = TOOL_CATEGORIES.get(name)
-            row = None
-            if cat:
-                row = next(
-                    (
-                        p
-                        for p in _visible_providers(cat, config, force_fresh=True)
-                        if p.get("name") == body.provider
-                    ),
-                    None,
-                )
-            managed_feature = (row or {}).get("managed_nous_feature")
-            if managed_feature:
-                features = get_nous_subscription_features(config, force_fresh=True)
-                acct = features.account_info
-                category = MANAGED_FEATURE_COVERAGE_CATEGORY.get(managed_feature)
-                entitled = bool(
-                    acct
-                    and acct.logged_in
-                    and (
-                        acct.tool_gateway_entitled_for(category)
-                        if category
-                        else acct.tool_gateway_entitled
-                    )
-                )
-                if not entitled:
-                    response["needs_nous_auth"] = True
-                    response["feature"] = managed_feature
         return response
 
     response = await asyncio.to_thread(_run)

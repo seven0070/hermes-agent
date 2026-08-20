@@ -362,20 +362,6 @@ _HERMES_MODEL_WARNING = (
     "(Claude, GPT, Gemini, DeepSeek, etc.)."
 )
 
-# Match only the real Nous Research Hermes 3 / Hermes 4 chat families.
-# The previous substring check (`"hermes" in name.lower()`) false-positived on
-# unrelated local Modelfiles like ``hermes-brain:qwen3-14b-ctx16k`` that just
-# happen to carry "hermes" in their tag but are fully tool-capable.
-#
-# Positive examples the regex must match:
-#   NousResearch/Hermes-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
-# Negative examples it must NOT match:
-#   hermes-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
-_NOUS_HERMES_NON_AGENTIC_RE = re.compile(
-    r"(?:^|[/:])hermes[-_ ]?[34](?:[-_.:]|$)",
-    re.IGNORECASE,
-)
-
 
 # Opaque internal model-ID display
 # ---------------------------------------------------------------------------
@@ -421,14 +407,18 @@ def format_model_for_display(model_name: str) -> str:
     return model_name
 
 
-# ---------------------------------------------------------------------------
-def is_nous_hermes_non_agentic(model_name: str) -> bool:
-    """Return True if *model_name* is a real Nous Hermes 3/4 chat model.
+# Positive examples the regex must match:
+#   NousResearch/Hermes-3-Llama-3.1-70B, hermes-4-405b, openrouter/hermes3:70b
+# Negative examples it must NOT match:
+#   hermes-brain:qwen3-14b-ctx16k, qwen3:14b, claude-opus-4-6
+_NOUS_HERMES_NON_AGENTIC_RE = re.compile(
+    r"(?:^|[/:])hermes[-_ ]?[34](?:[-_.:]|$)",
+    re.IGNORECASE,
+)
 
-    Used to decide whether to surface the non-agentic warning at startup.
-    Callers in :mod:`cli.py` and here should go through this single helper
-    so the two sites don't drift.
-    """
+
+def is_nous_hermes_non_agentic(model_name: str) -> bool:
+    """Return True if *model_name* is a real Nous Hermes 3/4 chat model."""
     if not model_name:
         return False
     return bool(_NOUS_HERMES_NON_AGENTIC_RE.search(model_name))
@@ -436,8 +426,8 @@ def is_nous_hermes_non_agentic(model_name: str) -> bool:
 
 def _check_hermes_model_warning(model_name: str) -> str:
     """Return a warning string if *model_name* is a Nous Hermes 3/4 chat model."""
-    if is_nous_hermes_non_agentic(model_name):
-        return _HERMES_MODEL_WARNING
+    # Detection helper removed with the Nous Portal integration; Hermes chat
+    # models are still selectable through aggregators without this warning.
     return ""
 
 
@@ -1213,7 +1203,7 @@ def _resolve_alias_fallback(
     Falls back to ``("openrouter", "nous")`` only when no authenticated
     providers are supplied (backwards compat for non-interactive callers).
     """
-    providers = authenticated_providers or ("openrouter", "nous")
+    providers = authenticated_providers or ("openrouter",)
     for provider in providers:
         # AmbiguousAliasError propagates: the alias exists on this provider,
         # the user just has to choose — trying the next provider instead
@@ -2137,16 +2127,6 @@ def switch_model(
     if target_provider in {"opencode-zen", "opencode-go", "opencode"}:
         api_mode = opencode_model_api_mode(target_provider, new_model)
 
-    # --- Nous Portal dual-wire override ---
-    # Portal serves anthropic/* on /v1/messages and everything else on
-    # /chat/completions. resolve_runtime_provider already sets this when it
-    # succeeds; always re-derive from the *final* (post-normalize) model so
-    # alias clears / empty fallbacks cannot leave Claude on the OpenAI wire.
-    if target_provider in {"nous", "nous-portal", "nousresearch"}:
-        from hermes_cli.providers import nous_api_mode
-
-        api_mode = nous_api_mode(new_model)
-
     # --- Determine api_mode if not already set ---
     if not api_mode:
         api_mode = determine_api_mode(
@@ -2628,7 +2608,7 @@ def list_authenticated_providers(
     from hermes_cli.models import (
         OPENROUTER_MODELS, _PROVIDER_MODELS,
         _MODELS_DEV_PREFERRED, _merge_with_models_dev, cached_provider_model_ids,
-        clear_provider_models_cache, get_curated_nous_model_ids,
+        clear_provider_models_cache,
     )
 
     # Explicit refresh: drop every provider's cached model-id list so the
@@ -2731,12 +2711,6 @@ def list_authenticated_providers(
     # Build curated model lists keyed by hermes provider ID
     curated: dict[str, list[str]] = dict(_PROVIDER_MODELS)
     curated["openrouter"] = [mid for mid, _ in OPENROUTER_MODELS]
-    # "nous" pulls from the remote model-catalog manifest published at
-    # https://hermes-agent.nousresearch.com/docs/api/model-catalog.json so
-    # newly added Portal models surface in the /model picker without
-    # requiring a Hermes release. Falls back to the in-repo
-    # _PROVIDER_MODELS["nous"] snapshot when the manifest is unreachable.
-    curated["nous"] = get_curated_nous_model_ids()
     # Ollama Cloud uses dynamic discovery (no static curated list)
     if "ollama-cloud" not in curated:
         from hermes_cli.models import fetch_ollama_cloud_models
@@ -3046,43 +3020,6 @@ def list_authenticated_providers(
                 model_ids = _ids if _ids else (curated.get(hermes_slug, []) or curated.get(pid, []))
             except Exception:
                 model_ids = curated.get(hermes_slug, []) or curated.get(pid, [])
-        elif hermes_slug == "nous":
-            # Nous serves a large live /v1/models catalog (vendor-prefixed
-            # models from many providers, returned alphabetically). The
-            # `hermes model` picker deliberately shows ONLY the curated agentic
-            # list — augmented with the Portal's free/paid recommendations so
-            # newly-launched models surface without a CLI release — in curated
-            # order. Mirror that exactly (see _model_flow_nous in main.py) so
-            # the GUI picker matches the CLI. Was: falling through to
-            # cached_provider_model_ids, which dumped the full alphabetical
-            # catalog; then: curated-only, which dropped the 4 Portal
-            # recommendations (e.g. stepfun/step-3.7-flash:free).
-            model_ids = curated.get("nous", [])
-            try:
-                from hermes_cli.models import (
-                    get_pricing_for_provider as _nous_pricing,
-                    check_nous_free_tier as _nous_free,
-                    union_with_portal_free_recommendations as _union_free,
-                    union_with_portal_paid_recommendations as _union_paid,
-                )
-                from hermes_cli.auth import get_provider_auth_state as _nous_state
-
-                _pricing = _nous_pricing("nous") or {}
-                _portal = ""
-                try:
-                    _st = _nous_state("nous") or {}
-                    _portal = _st.get("portal_base_url", "") or ""
-                except Exception:
-                    _portal = ""
-                if _nous_free(force_fresh=force_fresh_nous_tier):
-                    model_ids, _ = _union_free(model_ids, _pricing, _portal)
-                else:
-                    model_ids, _ = _union_paid(model_ids, _pricing, _portal)
-            except Exception:
-                # Portal recommendation fetch failed — fall back to the
-                # curated list alone (still correct, just may lag newly
-                # launched models, exactly like an offline CLI run).
-                pass
         else:
             # Unified pathway — see Section 1 rationale. Fall back to the
             # curated dict (with models.dev merge for preferred providers)

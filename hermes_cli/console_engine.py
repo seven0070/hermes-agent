@@ -929,20 +929,6 @@ class HermesConsoleEngine:
             confirmation="Send this message?",
         )
 
-        portal_paths = [("info",), ("tools",)]
-        _register_command_family(
-            self,
-            root="portal",
-            paths=portal_paths,
-            summaries=_adder_summaries("hermes_cli.portal_cli", "add_parser"),
-            handler_factory=lambda fixed: _adder_handler(
-                "portal",
-                fixed,
-                "hermes_cli.portal_cli",
-                "add_parser",
-            ),
-        )
-
         _register_command_family(
             self,
             root="project",
@@ -1212,8 +1198,6 @@ class HermesConsoleEngine:
             ("profile", "alias"): "`profile alias` creates shell wrappers and is not available in Hermes Console.",
             ("skills", "config"): "`skills config` is interactive and is not available in Hermes Console.",
             ("skills", "publish"): "`skills publish` is not available in Hermes Console.",
-            ("portal", "login"): "`portal login` is interactive and is not available in Hermes Console.",
-            ("portal", "open"): "`portal open` opens a browser and is not available in Hermes Console.",
             ("kanban", "tail"): "`kanban tail` streams output and is not available in Hermes Console.",
             ("kanban", "watch"): "`kanban watch` streams output and is not available in Hermes Console.",
             ("kanban", "daemon"): "`kanban daemon` starts a service and is not available in Hermes Console.",

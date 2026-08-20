@@ -542,32 +542,6 @@ def _ra():
     return run_agent
 
 
-def _nous_entitlement_message(capability: str) -> str:
-    try:
-        from hermes_cli.nous_account import (
-            format_nous_portal_entitlement_message,
-            get_nous_portal_account_info,
-        )
-
-        account_info = get_nous_portal_account_info(force_fresh=True)
-        message = format_nous_portal_entitlement_message(
-            account_info,
-            capability=capability,
-        )
-        return message or ""
-    except Exception:
-        return ""
-
-
-def _print_nous_entitlement_guidance(agent, capability: str) -> bool:
-    message = _nous_entitlement_message(capability)
-    if not message:
-        return False
-    for line in message.splitlines():
-        agent._vprint(f"{agent.log_prefix}   💡 {line}", force=True)
-    return True
-
-
 def _system_prompt_for_hooks(api_kwargs: Any, request_messages: Any) -> Any:
     """System prompt as actually sent to the provider, for observability hooks.
 
@@ -586,16 +560,6 @@ def _system_prompt_for_hooks(api_kwargs: Any, request_messages: Any) -> Any:
     return system_prompt
 
 
-def _is_nous_inference_route(provider: str, base_url: str) -> bool:
-    provider = (provider or "").strip().lower()
-    if provider == "nous":
-        return True
-    base = str(base_url or "")
-    return (
-        base_url_host_matches(base, "inference-api.nousresearch.com")
-    )
-
-
 def _billing_or_entitlement_message(
     *,
     capability: str,
@@ -604,9 +568,6 @@ def _billing_or_entitlement_message(
     model: str,
     unverified: bool = False,
 ) -> str:
-    if _is_nous_inference_route(provider, base_url):
-        return _nous_entitlement_message(capability)
-
     provider_label = (provider or "").strip() or "the selected provider"
     model_label = (model or "").strip() or "the selected model"
 
@@ -785,21 +746,6 @@ def _print_billing_or_entitlement_guidance(
     for line in message.splitlines():
         agent._vprint(f"{agent.log_prefix}   💡 {line}", force=True)
     return True
-
-
-def _try_refresh_nous_paid_entitlement_credentials(agent) -> bool:
-    """Refresh Nous runtime credentials after a fresh paid-entitlement check."""
-    try:
-        from hermes_cli.nous_account import get_nous_portal_account_info
-
-        account_info = get_nous_portal_account_info(force_fresh=True)
-        if account_info.paid_service_access is not True:
-            return False
-        return agent._try_refresh_nous_client_credentials(
-            force=True,
-        )
-    except Exception:
-        return False
 
 
 def _restore_or_build_system_prompt(agent, system_message, conversation_history):
@@ -2806,57 +2752,6 @@ def run_conversation(
         agent._current_api_request_id = api_request_id
 
         while retry_count < max_retries:
-            # ── Nous Portal rate limit guard ──────────────────────
-            # If another session already recorded that Nous is rate-
-            # limited, skip the API call entirely.  Each attempt
-            # (including SDK-level retries) counts against RPH and
-            # deepens the rate limit hole.
-            if agent.provider == "nous":
-                try:
-                    from agent.nous_rate_guard import (
-                        nous_rate_limit_remaining,
-                        format_remaining as _fmt_nous_remaining,
-                    )
-                    _nous_remaining = nous_rate_limit_remaining()
-                    if _nous_remaining is not None and _nous_remaining > 0:
-                        _nous_msg = (
-                            f"Nous Portal rate limit active — "
-                            f"resets in {_fmt_nous_remaining(_nous_remaining)}."
-                        )
-                        agent._buffer_vprint(
-                            f"⏳ {_nous_msg} Trying fallback..."
-                        )
-                        agent._buffer_status(f"⏳ {_nous_msg}")
-                        if agent._try_activate_fallback():
-                            active_system_prompt = _sync_failover_system_message(
-                                agent, api_messages, active_system_prompt)
-                            retry_count = 0
-                            compression_attempts = 0
-                            _retry.primary_recovery_attempted = False
-                            _retry.restart_with_rebuilt_messages = True
-                            break
-                        # No fallback available — surface buffered context
-                        # so user sees the rate-limit message that led here.
-                        agent._flush_status_buffer()
-                        agent._persist_session(messages, conversation_history)
-                        return {
-                            "final_response": (
-                                f"⏳ {_nous_msg}\n\n"
-                                "No fallback provider available. "
-                                "Try again after the reset, or add a "
-                                "fallback provider in config.yaml."
-                            ),
-                            "messages": messages,
-                            "api_calls": api_call_count,
-                            "completed": False,
-                            "failed": True,
-                            "error": _nous_msg,
-                        }
-                except ImportError:
-                    pass
-                except Exception:
-                    pass  # Never let rate guard break the agent loop
-
             try:
                 agent._reset_stream_delivery_tracking()
                 # api_messages is built once, before this retry loop, while the
@@ -4304,15 +4199,6 @@ def run_conversation(
                 # usable content. Empty responses still loop through the
                 # empty-retry path below; the buffer is cleared when
                 # genuinely successful content is detected later (~L4127).
-                # Clear Nous rate limit state on successful request —
-                # proves the limit has reset and other sessions can
-                # resume hitting Nous.
-                if agent.provider == "nous":
-                    try:
-                        from agent.nous_rate_guard import clear_nous_rate_limit
-                        clear_nous_rate_limit()
-                    except Exception:
-                        pass
                 from agent import relay_llm
 
                 relay_llm.complete_logical_call(
@@ -4683,23 +4569,6 @@ def run_conversation(
                     reason=classified.reason.value,
                 )
 
-                if (
-                    classified.reason == FailoverReason.billing
-                    and _is_nous_inference_route(
-                        getattr(agent, "provider", "") or "",
-                        getattr(agent, "base_url", "") or "",
-                    )
-                    and not _retry.nous_paid_entitlement_refresh_attempted
-                ):
-                    _retry.nous_paid_entitlement_refresh_attempted = True
-                    if _try_refresh_nous_paid_entitlement_credentials(agent):
-                        agent._vprint(
-                            f"{agent.log_prefix}🔐 Nous paid access verified — "
-                            "refreshed runtime credentials and retrying request...",
-                            force=True,
-                        )
-                        continue
-
                 recovered_with_pool, _retry.has_retried_429 = agent._recover_with_credential_pool(
                     status_code=status_code,
                     has_retried_429=_retry.has_retried_429,
@@ -4814,38 +4683,6 @@ def run_conversation(
                     if agent._try_refresh_vertex_client_credentials():
                         agent._buffer_vprint("🔐 Vertex AI token refreshed after 401. Retrying request...")
                         continue
-                if (
-                    agent.api_mode in ("chat_completions", "anthropic_messages")
-                    and agent.provider == "nous"
-                    and status_code == 401
-                    and not _retry.nous_auth_retry_attempted
-                ):
-                    _retry.nous_auth_retry_attempted = True
-                    if agent._try_refresh_nous_client_credentials(force=True):
-                        print(f"{agent.log_prefix}🔐 Nous agent key refreshed after 401. Retrying request...")
-                        continue
-                    # Credential refresh didn't help — show diagnostic info.
-                    # Most common causes: Portal OAuth expired/revoked,
-                    # account out of credits, or agent key blocked.
-                    from hermes_constants import display_hermes_home as _dhh_fn
-                    _dhh = _dhh_fn()
-                    _body_text = ""
-                    try:
-                        _body = getattr(api_error, "body", None) or getattr(api_error, "response", None)
-                        if _body is not None:
-                            _body_text = str(_body)[:200]
-                    except Exception:
-                        pass
-                    print(f"{agent.log_prefix}🔐 Nous 401 — Portal authentication failed.")
-                    if _body_text:
-                        print(f"{agent.log_prefix}   Response: {_body_text}")
-                    if not _print_nous_entitlement_guidance(agent, "Nous model access"):
-                        print(f"{agent.log_prefix}   Most likely: Portal OAuth expired, account out of credits, or agent key revoked.")
-                    print(f"{agent.log_prefix}   Troubleshooting:")
-                    print(f"{agent.log_prefix}     • Re-authenticate: hermes auth add nous")
-                    print(f"{agent.log_prefix}     • Check credits / billing: https://portal.nousresearch.com")
-                    print(f"{agent.log_prefix}     • Verify stored credentials: {_dhh}/auth.json")
-                    print(f"{agent.log_prefix}     • Switch providers temporarily: /model <model> --provider openrouter")
                 if (
                     _is_copilot_provider(agent)
                     and status_code == 401
@@ -5445,54 +5282,6 @@ def run_conversation(
                 # apart via the 429's own x-ratelimit-* headers and
                 # the last-known-good state captured on the previous
                 # successful response.
-                if (
-                    is_rate_limited
-                    and agent.provider == "nous"
-                    and classified.reason == FailoverReason.rate_limit
-                    and not recovered_with_pool
-                ):
-                    _genuine_nous_rate_limit = False
-                    try:
-                        from agent.nous_rate_guard import (
-                            is_genuine_nous_rate_limit,
-                            record_nous_rate_limit,
-                        )
-                        _err_resp = getattr(api_error, "response", None)
-                        _err_hdrs = (
-                            getattr(_err_resp, "headers", None)
-                            if _err_resp else None
-                        )
-                        _genuine_nous_rate_limit = is_genuine_nous_rate_limit(
-                            headers=_err_hdrs,
-                            last_known_state=agent._rate_limit_state,
-                        )
-                        if _genuine_nous_rate_limit:
-                            record_nous_rate_limit(
-                                headers=_err_hdrs,
-                                error_context=error_context,
-                            )
-                        else:
-                            logger.info(
-                                "Nous 429 looks like upstream capacity "
-                                "(no exhausted bucket in headers or "
-                                "last-known state) -- not tripping "
-                                "cross-session breaker."
-                            )
-                    except Exception:
-                        pass
-                    if _genuine_nous_rate_limit:
-                        # Re-enter the loop exactly once so the
-                        # top-of-loop Nous guard handles fallback or
-                        # bails cleanly. (Setting retry_count to
-                        # max_retries would make the while condition
-                        # false immediately and the guard would never
-                        # run -- no fallback, generic exhaustion error.)
-                        retry_count = max(0, max_retries - 1)
-                        continue
-                    # Upstream capacity 429: fall through to normal
-                    # retry logic.  A different model (or the same
-                    # model a moment later) will typically succeed.
-
                 is_payload_too_large = (
                     classified.reason == FailoverReason.payload_too_large
                 )
@@ -6080,12 +5869,7 @@ def run_conversation(
                             unverified=classified.billing_unverified,
                         ):
                             pass
-                        elif _provider == "nous" and _print_nous_entitlement_guidance(
-                            agent,
-                            "Nous model access",
-                        ):
-                            pass
-                        elif _provider in {"openai-codex", "xai-oauth", "nous"} and status_code == 401:
+                        elif _provider in {"openai-codex", "xai-oauth"} and status_code == 401:
                             if _provider == "openai-codex":
                                 agent._vprint(f"{agent.log_prefix}   💡 Codex OAuth token was rejected (HTTP 401). Your token may have been", force=True)
                                 agent._vprint(f"{agent.log_prefix}      refreshed by another client (Codex CLI, VS Code). To fix:", force=True)
@@ -6094,17 +5878,6 @@ def run_conversation(
                             elif _provider == "xai-oauth":
                                 agent._vprint(f"{agent.log_prefix}   💡 xAI OAuth token was rejected (HTTP 401). To fix:", force=True)
                                 agent._vprint(f"{agent.log_prefix}      re-authenticate with xAI Grok OAuth (SuperGrok / Premium+) from `hermes model`.", force=True)
-                            else:  # nous
-                                agent._vprint(f"{agent.log_prefix}   💡 Nous Portal OAuth token was rejected (HTTP 401). Your token may be", force=True)
-                                agent._vprint(f"{agent.log_prefix}      expired, revoked, or your account may be out of credits. To fix:", force=True)
-                                agent._vprint(f"{agent.log_prefix}      1. Re-authenticate: hermes portal", force=True)
-                                agent._vprint(f"{agent.log_prefix}      2. Check your portal account: https://portal.nousresearch.com", force=True)
-                                # ``:free`` is OpenRouter slug syntax; Nous Portal will reject
-                                # the model name even after a successful re-auth.
-                                if isinstance(_model, str) and _model.endswith(":free"):
-                                    agent._vprint(f"{agent.log_prefix}      ⚠️  Note: `{_model}` looks like an OpenRouter slug (`:free` suffix).", force=True)
-                                    agent._vprint(f"{agent.log_prefix}         Nous Portal won't recognize that model name. Either switch to a", force=True)
-                                    agent._vprint(f"{agent.log_prefix}         Nous catalog model, or run `/model openrouter:{_model}` to use OpenRouter.", force=True)
                         else:
                             agent._vprint(f"{agent.log_prefix}   💡 Your API key was rejected by the provider. Check:", force=True)
                             agent._vprint(f"{agent.log_prefix}      • Is the key valid? Run: hermes setup", force=True)

@@ -22,8 +22,7 @@ import copy
 from pathlib import Path
 from typing import Optional, Dict, Any
 
-from hermes_cli.nous_subscription import get_nous_subscription_features
-from tools.tool_backend_helpers import managed_nous_tools_enabled
+from hermes_cli.tool_features import get_tool_subscription_features
 from hermes_constants import get_optional_skills_dir
 
 logger = logging.getLogger(__name__)
@@ -414,14 +413,13 @@ def _print_setup_summary(config: dict, hermes_home):
         print_warning("No inference provider is configured — Hermes cannot chat yet.")
         print_info("  Finish this one step with either of:")
         print_info("    hermes model            (pick any provider/model)")
-        print_info("    hermes setup --portal   (Nous Portal OAuth, no API key)")
 
     # Tool availability summary
     print()
     print_header("Tool Availability Summary")
 
     tool_status = []
-    subscription_features = get_nous_subscription_features(config)
+    subscription_features = get_tool_subscription_features(config)
 
     # Vision — use the same runtime resolver as the actual vision tools
     try:
@@ -438,9 +436,7 @@ def _print_setup_summary(config: dict, hermes_home):
 
 
     # Web tools (Exa, Parallel, Firecrawl, or Tavily)
-    if subscription_features.web.managed_by_nous:
-        tool_status.append(("Web Search & Extract (Nous subscription)", True, None))
-    elif subscription_features.web.available:
+    if subscription_features.web.available:
         label = "Web Search & Extract"
         if subscription_features.web.current_provider:
             label = f"Web Search & Extract ({subscription_features.web.current_provider})"
@@ -450,9 +446,7 @@ def _print_setup_summary(config: dict, hermes_home):
 
     # Browser tools (local Chromium, Camofox, Browserbase, Browser Use, or Firecrawl)
     browser_provider = subscription_features.browser.current_provider
-    if subscription_features.browser.managed_by_nous:
-        tool_status.append(("Browser Automation (Nous Browser Use)", True, None))
-    elif subscription_features.browser.available:
+    if subscription_features.browser.available:
         label = "Browser Automation"
         if browser_provider:
             label = f"Browser Automation ({browser_provider})"
@@ -480,9 +474,7 @@ def _print_setup_summary(config: dict, hermes_home):
 
     # Image generation — FAL (direct or via Nous), or any plugin-registered
     # provider (OpenAI, etc.)
-    if subscription_features.image_gen.managed_by_nous:
-        tool_status.append(("Image Generation (Nous subscription)", True, None))
-    elif subscription_features.image_gen.available:
+    if subscription_features.image_gen.available:
         tool_status.append(("Image Generation", True, None))
     else:
         # Fall back to probing plugin-registered providers so OpenAI-only
@@ -512,9 +504,7 @@ def _print_setup_summary(config: dict, hermes_home):
     # Video generation — opt-in via `hermes tools` → Video Generation.
     # Only show the row when a plugin reports available so we don't badger
     # users who don't care about video gen with a "missing" status line.
-    if subscription_features.video_gen.managed_by_nous:
-        tool_status.append(("Video Generation (FAL via Nous subscription)", True, None))
-    else:
+    if True:
         try:
             from agent.video_gen_registry import list_providers as _list_video_providers
             from hermes_cli.plugins import _ensure_plugins_discovered as _ensure_plugins
@@ -534,9 +524,7 @@ def _print_setup_summary(config: dict, hermes_home):
 
     # TTS — show configured provider
     tts_provider = cfg_get(config, "tts", "provider", default="edge")
-    if subscription_features.tts.managed_by_nous:
-        tool_status.append(("Text-to-Speech (OpenAI via Nous subscription)", True, None))
-    elif tts_provider == "elevenlabs" and get_env_value("ELEVENLABS_API_KEY"):
+    if tts_provider == "elevenlabs" and get_env_value("ELEVENLABS_API_KEY"):
         tool_status.append(("Text-to-Speech (ElevenLabs)", True, None))
     elif tts_provider == "openai" and (
         get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
@@ -571,10 +559,7 @@ def _print_setup_summary(config: dict, hermes_home):
 
     # STT — show configured provider
     stt_provider = cfg_get(config, "stt", "provider", default="local") or "local"
-    _stt_feature = subscription_features.features.get("stt")
-    if _stt_feature is not None and _stt_feature.managed_by_nous:
-        tool_status.append(("Speech-to-Text (OpenAI via Nous subscription)", True, None))
-    elif stt_provider == "openai" and (
+    if stt_provider == "openai" and (
         get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
     ):
         tool_status.append(("Speech-to-Text (OpenAI)", True, None))
@@ -598,15 +583,11 @@ def _print_setup_summary(config: dict, hermes_home):
                 ("Speech-to-Text (Local Whisper — not installed)", False, "run 'hermes tools' → Speech-to-Text")
             )
 
-    if subscription_features.modal.managed_by_nous:
-        tool_status.append(("Modal Execution (Nous subscription)", True, None))
-    elif cfg_get(config, "terminal", "backend") == "modal":
+    if cfg_get(config, "terminal", "backend") == "modal":
         if subscription_features.modal.direct_override:
             tool_status.append(("Modal Execution (direct Modal)", True, None))
         else:
             tool_status.append(("Modal Execution", False, "run 'hermes setup terminal'"))
-    elif managed_nous_tools_enabled() and subscription_features.nous_auth_present:
-        tool_status.append(("Modal Execution (optional via Nous subscription)", True, None))
 
     # Home Assistant
     if get_env_value("HASS_TOKEN"):
@@ -920,7 +901,6 @@ def setup_model_provider(config: dict, *, quick: bool = False):
     # `hermes setup tts`. This keeps both quick and full setup thin.
 
 
-    # Tool Gateway prompt is already shown by _model_flow_nous() above.
     save_config(config)
 
 
@@ -1080,7 +1060,7 @@ def _setup_tts_provider(config: dict):
     """Interactive TTS provider selection with install flow for NeuTTS."""
     tts_config = config.get("tts", {})
     current_provider = tts_config.get("provider", "edge")
-    subscription_features = get_nous_subscription_features(config)
+    subscription_features = get_tool_subscription_features(config)
 
     provider_labels = {
         "edge": "Edge TTS",
@@ -1102,9 +1082,6 @@ def _setup_tts_provider(config: dict):
 
     choices = []
     providers = []
-    if managed_nous_tools_enabled() and subscription_features.nous_auth_present:
-        choices.append("Nous Subscription (managed OpenAI TTS, billed to your subscription)")
-        providers.append("nous-openai")
     choices.extend(
         [
             "Edge TTS (free, cloud-based, no setup needed)",
@@ -1127,14 +1104,6 @@ def _setup_tts_provider(config: dict):
         return
 
     selected = providers[idx]
-    selected_via_nous = selected == "nous-openai"
-    if selected == "nous-openai":
-        selected = "openai"
-        print_info("OpenAI TTS will use the managed Nous gateway and bill to your subscription.")
-        if get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY"):
-            print_warning(
-                "Direct OpenAI credentials are still configured and may take precedence until removed from ~/.hermes/.env."
-            )
 
     if selected == "neutts":
         # Check if already installed
@@ -1171,7 +1140,7 @@ def _setup_tts_provider(config: dict):
                 print_warning("No API key provided. Falling back to Edge TTS.")
                 selected = "edge"
 
-    elif selected == "openai" and not selected_via_nous:
+    elif selected == "openai":
         existing = get_env_value("VOICE_TOOLS_OPENAI_KEY") or get_env_value("OPENAI_API_KEY")
         if not existing:
             print()
@@ -1437,15 +1406,9 @@ def setup_terminal_backend(config: dict):
     elif selected_backend == "modal":
         print_success("Terminal backend: Modal")
         print_info("Serverless cloud sandboxes. Each session gets its own container.")
-        from tools.managed_tool_gateway import is_managed_tool_gateway_ready
         from tools.tool_backend_helpers import normalize_modal_mode
 
-        managed_modal_available = bool(
-            managed_nous_tools_enabled()
-            and
-            get_nous_subscription_features(config).nous_auth_present
-            and is_managed_tool_gateway_ready("modal")
-        )
+        managed_modal_available = False  # managed gateway removed
         modal_mode = normalize_modal_mode(cfg_get(config, "terminal", "modal_mode"))
         use_managed_modal = False
         if managed_modal_available:
@@ -2758,90 +2721,6 @@ SETUP_SECTIONS = [
 ]
 
 
-def _run_portal_one_shot(config: dict) -> None:
-    """One-shot Nous Portal setup — OAuth + model pick + provider + Tool Gateway.
-
-    Wired into ``hermes setup --portal`` and ``hermes portal``. This is the
-    Nous-Portal slice of the first-time quick setup, collapsed into a single
-    shareable command so a brand-new user goes from zero to a fully working
-    Hermes session — model selected, provider set, and web/image/tts/browser
-    tools routed via their Portal sub — without being told to run
-    ``hermes setup`` and hunt for the quick-setup option.
-
-    The login + model selection + provider switch + Tool Gateway opt-in are all
-    delegated to ``_model_flow_nous`` — the exact same flow quick setup uses
-    (``_run_first_time_quick_setup``) and the same one ``hermes model`` runs
-    when you pick Nous. Routing through it (instead of hand-rolling the auth +
-    provider write here) means ``hermes portal`` always offers a model picker,
-    and there is a single source of truth for the Nous onboarding steps.
-    """
-    from hermes_cli.config import load_config
-
-    print()
-    print(
-        color(
-            "┌─────────────────────────────────────────────────────────┐",
-            Colors.MAGENTA,
-        )
-    )
-    print(color("│     ⚕ Hermes Setup — Nous Portal (one-shot)             │", Colors.MAGENTA))
-    print(
-        color(
-            "└─────────────────────────────────────────────────────────┘",
-            Colors.MAGENTA,
-        )
-    )
-    print()
-    print_info("  One subscription, 300+ models, plus the Tool Gateway:")
-    print_info("    web search, image generation, TTS, browser automation")
-    print_info("    — all routed through your Nous Portal sub.")
-    print()
-    print_info("  Sign up: https://portal.nousresearch.com/manage-subscription")
-    print()
-
-    # _model_flow_nous handles BOTH the logged-out path (device-code OAuth,
-    # which selects a model internally) and the already-logged-in path (curated
-    # Nous model picker), then offers the Tool Gateway opt-in and sets
-    # provider=nous via the login/model save. This is the same routine quick
-    # setup calls, so `hermes portal` == quick setup's Nous step.
-    try:
-        from hermes_cli.main import _model_flow_nous
-
-        _model_flow_nous(config)
-    except (KeyboardInterrupt, EOFError, SystemExit):
-        # _login_nous raises SystemExit(130)/(1) on cancel/failure; the
-        # logged-out path inside _model_flow_nous catches it, but the
-        # expired-session re-login path only catches Exception, so a
-        # SystemExit there would otherwise escape and kill the whole CLI.
-        # Treat all of these as a graceful cancel/abort for the portal flow.
-        print()
-        print_info("  Setup cancelled.")
-        print_info("  You can retry later with `hermes portal`.")
-        return
-    except Exception as exc:
-        logger.debug("_model_flow_nous error during `hermes portal`: %s", exc)
-        print()
-        print_error(f"  Nous Portal setup encountered an error: {exc}")
-        print_info("  You can retry later with `hermes portal`.")
-        return
-
-    # Re-sync the in-memory config from disk — _model_flow_nous (and the
-    # underlying login/model save) write via their own load/save cycle, so any
-    # later save_config(config) by a caller must not clobber those values.
-    try:
-        _refreshed = load_config()
-        if isinstance(_refreshed, dict):
-            config.clear()
-            config.update(_refreshed)
-    except Exception:
-        pass
-
-    print()
-    print_success("Portal setup complete.")
-    print_info("  Run `hermes portal info` to inspect routing.")
-    print_info("  Run `hermes` to start chatting.")
-
-
 def run_setup_wizard(args):
     """Run the interactive setup wizard.
 
@@ -2898,9 +2777,6 @@ def run_setup_wizard(args):
         )
         return
 
-    # --portal: one-shot Nous Portal setup. Skips the rest of the wizard.
-    if bool(getattr(args, "portal", False)):
-        _run_portal_one_shot(config)
         return
 
     # Check if a specific section was requested
@@ -3084,38 +2960,35 @@ def run_setup_wizard(args):
 
 
 def _run_first_time_quick_setup(config: dict, hermes_home, is_existing: bool):
-    """Streamlined first-time setup via Nous Portal: OAuth, model, terminal & messaging.
+    """Streamlined first-time setup: model provider, terminal & messaging.
 
-    Routes straight to the Nous Portal provider — runs the device-code OAuth
-    login, picks a Nous model, then configures the terminal backend and (optionally)
-    a messaging platform. Applies sensible defaults for everything else (agent
-    settings, tools); the user can customize later via ``hermes setup <section>``
-    or switch providers with ``hermes model``.
+    Walks the user through picking a model provider, then configures the
+    terminal backend and (optionally) a messaging platform. Applies sensible
+    defaults for everything else (agent settings, tools); the user can
+    customize later via ``hermes setup <section>`` or ``hermes model``.
     """
     from hermes_cli.config import load_config
 
-    # Step 1: Nous Portal — OAuth login + model selection.
-    # _model_flow_nous() handles both the logged-out path (device-code OAuth,
-    # which selects a model internally) and the already-logged-in path (curated
-    # Nous model picker). Provider is set to "nous" by the login/model save.
+    # Step 1: Model provider — hand off to the generic provider/model flow
+    # (the former Nous Portal one-shot step was removed with that integration).
     print()
-    print_header("Nous Portal")
-    print_info("One subscription, 300+ models, plus the Tool Gateway:")
-    print_info("  web search, image generation, TTS, browser automation.")
-    print_info("Sign up: https://portal.nousresearch.com/manage-subscription")
+    print_header("Model Provider")
+    print_info("Pick an inference provider and model to run Hermes with.")
     print()
     try:
-        from hermes_cli.main import _model_flow_nous
-        _model_flow_nous(config)
+        from hermes_cli.main import select_provider_and_model
+        select_provider_and_model()
+    except SystemExit:
+        raise
     except (KeyboardInterrupt, EOFError):
         print()
-        print_info("Nous Portal setup cancelled.")
+        print_info("Model provider setup cancelled.")
     except Exception as exc:
-        logger.debug("_model_flow_nous error during quick setup: %s", exc)
-        print_warning(f"Nous Portal setup encountered an error: {exc}")
+        logger.debug("select_provider_and_model error during quick setup: %s", exc)
+        print_warning(f"Model provider setup encountered an error: {exc}")
         print_info("You can try again later with: hermes model")
 
-    # Re-sync the wizard's config dict from disk — _model_flow_nous (and the
+    # Re-sync the wizard's config dict from disk — the model flow (and the
     # underlying login/model save) write via their own load/save cycle, and the
     # wizard's later save_config(config) must not clobber those values (#4172).
     _refreshed = load_config()

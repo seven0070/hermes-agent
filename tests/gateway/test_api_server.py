@@ -921,7 +921,7 @@ class TestToolsetsEndpoint:
             "hermes_cli.tools_config._get_platform_tools",
             return_value={"default"},
         ), patch(
-            "hermes_cli.tools_config.get_nous_subscription_features",
+            "hermes_cli.tools_config.get_tool_subscription_features",
             return_value=feature_snapshot,
         ) as resolve_features, patch(
             "hermes_cli.tools_config._toolset_has_keys",

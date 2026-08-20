@@ -2,7 +2,7 @@
 """Build the Hermes Model Catalog — a centralized JSON manifest of curated models.
 
 This script reads the in-repo hardcoded curated lists (``OPENROUTER_MODELS``,
-``_PROVIDER_MODELS["nous"]``) and writes them to a JSON manifest that the
+and writes them to a JSON manifest that the
 Hermes CLI fetches at runtime. Publishing the catalog through the docs site
 lets maintainers update model lists without shipping a Hermes release.
 
@@ -51,13 +51,6 @@ def _openrouter_entry(mid: str, desc: str) -> dict:
     return entry
 
 
-def _nous_entry(mid: str) -> dict:
-    entry: dict = {"id": mid}
-    if mid == PREFERRED_SILENT_DEFAULT_MODEL:
-        entry["default"] = True
-    return entry
-
-
 def build_catalog() -> dict:
     return {
         "version": CATALOG_VERSION,
@@ -80,21 +73,6 @@ def build_catalog() -> dict:
                 "models": [
                     _openrouter_entry(mid, desc)
                     for mid, desc in OPENROUTER_MODELS
-                ],
-            },
-            "nous": {
-                "metadata": {
-                    "display_name": "Nous Portal",
-                    "note": (
-                        "Free-tier gating is determined live via Portal pricing "
-                        "(partition_nous_models_by_tier), not this manifest. "
-                        'The entry labeled "default": true is the model Hermes '
-                        "silently lands on when the user never picked one."
-                    ),
-                },
-                "models": [
-                    _nous_entry(mid)
-                    for mid in _PROVIDER_MODELS.get("nous", [])
                 ],
             },
         },

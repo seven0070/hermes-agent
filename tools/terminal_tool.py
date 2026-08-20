@@ -83,8 +83,6 @@ from tools.environments.singularity import _get_scratch_dir
 from tools.tool_backend_helpers import (
     coerce_modal_mode,
     has_direct_modal_credentials,
-    managed_nous_tools_enabled,
-    nous_tool_gateway_unavailable_message,
     resolve_modal_backend_state,
 )
 
@@ -1870,31 +1868,22 @@ def _create_environment(env_type: str, image: str, cwd: str, timeout: int,
         if modal_state["selected_backend"] != "direct":
             if modal_state["managed_mode_blocked"]:
                 raise ValueError(
-                    "Modal backend is configured for managed mode, but "
-                    "Nous Tool Gateway access is not currently available and no direct "
-                    "Modal credentials/config were found. "
-                    + nous_tool_gateway_unavailable_message(
-                        "managed Modal execution",
-                    )
-                    + " Choose TERMINAL_MODAL_MODE=direct/auto to use direct Modal credentials."
+                    "Modal backend is configured for managed mode, but the "
+                    "managed tool gateway is unavailable and no direct Modal "
+                    "credentials/config were found. "
+                    "Choose TERMINAL_MODAL_MODE=direct/auto to use direct Modal credentials."
                 )
             if modal_state["mode"] == "managed":
                 raise ValueError(
-                    "Modal backend is configured for managed mode, but the managed tool gateway is unavailable. "
-                    + nous_tool_gateway_unavailable_message(
-                        "managed Modal execution",
-                    )
+                    "Modal backend is configured for managed mode, but the managed tool gateway is unavailable."
                 )
             if modal_state["mode"] == "direct":
                 raise ValueError(
                     "Modal backend is configured for direct mode, but no direct Modal credentials/config were found."
                 )
-            message = "Modal backend selected but no direct Modal credentials/config was found."
-            if managed_nous_tools_enabled():
-                message = (
-                    "Modal backend selected but no direct Modal credentials/config or managed tool gateway was found."
-                )
-            raise ValueError(message)
+            raise ValueError(
+                "Modal backend selected but no direct Modal credentials/config was found."
+            )
 
         return _ModalEnvironment(
             image=image, cwd=cwd, timeout=timeout,
@@ -3737,50 +3726,30 @@ def check_terminal_requirements() -> bool:
             if modal_state["selected_backend"] != "direct":
                 if modal_state["managed_mode_blocked"]:
                     logger.error(
-                        "Modal backend selected with TERMINAL_MODAL_MODE=managed, but "
-                        "Nous Tool Gateway access is not currently available and no direct "
-                        "Modal credentials/config were found. %s Choose "
-                        "TERMINAL_MODAL_MODE=direct/auto to use direct Modal credentials.",
-                        nous_tool_gateway_unavailable_message(
-                            "managed Modal execution",
-                        ),
+                        "Modal backend selected with TERMINAL_MODAL_MODE=managed, but the "
+                        "managed tool gateway is unavailable and no direct Modal "
+                        "credentials/config were found. Choose "
+                        "TERMINAL_MODAL_MODE=direct/auto to use direct Modal credentials."
                     )
                     return False
                 if modal_state["mode"] == "managed":
                     logger.error(
                         "Modal backend selected with TERMINAL_MODAL_MODE=managed, but the managed "
-                        "tool gateway is unavailable. %s",
-                        nous_tool_gateway_unavailable_message(
-                            "managed Modal execution",
-                        ),
+                        "tool gateway is unavailable."
                     )
                     return False
                 elif modal_state["mode"] == "direct":
-                    if managed_nous_tools_enabled():
-                        logger.error(
-                            "Modal backend selected with TERMINAL_MODAL_MODE=direct, but no direct "
-                            "Modal credentials/config were found. Configure Modal or choose "
-                            "TERMINAL_MODAL_MODE=managed/auto."
-                        )
-                    else:
-                        logger.error(
-                            "Modal backend selected with TERMINAL_MODAL_MODE=direct, but no direct "
-                            "Modal credentials/config were found. Configure Modal or choose "
-                            "TERMINAL_MODAL_MODE=auto."
-                        )
+                    logger.error(
+                        "Modal backend selected with TERMINAL_MODAL_MODE=direct, but no direct "
+                        "Modal credentials/config were found. Configure Modal or choose "
+                        "TERMINAL_MODAL_MODE=auto."
+                    )
                     return False
                 else:
-                    if managed_nous_tools_enabled():
-                        logger.error(
-                            "Modal backend selected but no direct Modal credentials/config or managed "
-                            "tool gateway was found. Configure Modal, set up the managed gateway, "
-                            "or choose a different TERMINAL_ENV."
-                        )
-                    else:
-                        logger.error(
-                            "Modal backend selected but no direct Modal credentials/config was found. "
-                            "Configure Modal or choose a different TERMINAL_ENV."
-                        )
+                    logger.error(
+                        "Modal backend selected but no direct Modal credentials/config was found. "
+                        "Configure Modal or choose a different TERMINAL_ENV."
+                    )
                     return False
 
             if importlib.util.find_spec("modal") is None:
