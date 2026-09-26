@@ -5909,6 +5909,9 @@ def resolve_provider_client(
     # which aliases to "kimi-coding") is still reachable via the named-custom
     # branch below.
     original_provider = (provider or "").strip().lower()
+    if original_provider == "nous":
+        logger.warning("Nous Portal was removed; choose another model provider")
+        return None, None
     # Normalise aliases
     provider = _normalize_aux_provider(provider)
 

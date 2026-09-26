@@ -2375,6 +2375,8 @@ def _fallback_entry_key(fb: dict) -> tuple[str, str, str]:
 
 def _fallback_entry_unavailable_without_network(agent, fb: dict) -> Optional[str]:
     """Return a skip reason for fallback entries known to be unusable locally."""
+    if str(fb.get("provider") or "").strip().lower() == "nous":
+        return "Nous Portal was removed; select a different fallback provider"
     return None
 
 

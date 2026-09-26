@@ -1,62 +1,8 @@
-"""OpenRouter-compatible image generation backend (OpenRouter + Nous Portal).
+"""OpenRouter image-generation backend.
 
-Both OpenRouter and the Nous Portal inference endpoint speak the same
-OpenAI-style ``/chat/completions`` image-generation protocol: send
-``modalities: ["image", "text"]`` with an image-output model (e.g.
-``google/gemini-3-pro-image``), pass reference images as ``image_url``
-content parts for grounding, and read the generated images back from
-``choices[0].message.images[].image_url.url`` (a ``data:image/...;base64`` URI).
-
-Nous Portal proxies OpenRouter, so one implementation services both — we only
-swap the resolved ``(base_url, api_key)``. Credentials are resolved through the
-agent's existing :func:`~hermes_cli.runtime_provider.resolve_runtime_provider`,
-which already understands OpenRouter's key pool and the Nous OAuth device-code
-token, so this plugin never reinvents auth.
-
-Reference grounding is the reason pet sprite generation cares about this
-backend: each animation row must stay the same character as the chosen base
-frame, which only works on models that accept image input. Gemini Flash Image
-("nano-banana") does, so both providers advertise image-to-image support.
-
-Two request surfaces
---------------------
-OpenRouter ships a *second*, entirely separate image surface: the **Dedicated
-Image API** at ``POST /api/v1/images/generations``, with its own catalog
-(``GET /api/v1/images/models``) and the full OpenAI-style parameter set.
-``openai/gpt-image-2``, ``openai/gpt-image-1-mini``, ``krea/krea-2-*``,
-``qwen/qwen-image-3-pro``, ``microsoft/mai-image-2.5*`` and
-``x-ai/grok-imagine-image-quality`` are reachable *only* there.
-
-Why routing is not "is it in the image catalog?"
-    The two catalogs **overlap**. As of 2026-08 ``GET /images/models`` lists 40
-    models, and that list includes this backend's own chat-completions defaults
-    (``openai/gpt-5.4-image-2`` and ``google/gemini-3-pro-image``). Routing on
-    catalog membership alone would therefore move every existing default call
-    off ``/chat/completions`` — a silent behaviour change for setups that work
-    today, and one that changes how reference images are passed (content parts
-    vs ``input_references``).
-
-So the surface is chosen conservatively, per model, by
-:func:`_select_surface`:
-
-* ``image_gen.openrouter.surface`` / ``OPENROUTER_IMAGE_API_SURFACE`` forces
-  ``images`` or ``chat`` when an operator wants to decide themselves;
-* otherwise (``auto``, the default) only ids in :data:`_IMAGE_API_MODELS` —
-  curated, and none of them reachable over chat-completions — take the new
-  path. The chat defaults stay pinned to chat-completions no matter what the
-  catalog says;
-* an id in neither group keeps today's behaviour, and the cached, best-effort
-  ``GET /images/models`` probe is used only to log a one-line hint that the
-  model is available on the Image API and how to switch. Nothing reroutes
-  itself behind the operator's back, and a failed probe costs nothing.
-
-On the Image API path the request gains exact per-model aspect ratios plus
-``resolution`` / ``quality`` / ``background`` / ``seed`` / ``n`` /
-``output_compression``, and up to 16 reference images instead of 3.
-
-The Image API is OpenRouter-only: Nous Portal proxies the chat-completions
-protocol and has no ``/images/generations`` route, so the second surface is
-enabled per provider (see ``supports_image_api``) and stays off for Nous.
+Supports chat-completions image output and OpenRouter's dedicated Image API.
+Reference images can ground pet sprite generation. The Nous Portal provider
+was removed from this fork; OpenRouter's API-key path remains independent.
 """
 
 from __future__ import annotations
@@ -795,7 +741,7 @@ def _save_image_api_entry(entry: Dict[str, Any], prefix: str) -> Optional[str]:
 class OpenRouterCompatImageProvider(ImageGenProvider):
     """Image generation over an OpenRouter-compatible chat-completions endpoint.
 
-    Instantiated once per backend (OpenRouter, Nous Portal). The two differ only
+    Instantiated for OpenRouter. Backends differ only
     in which runtime provider supplies ``(base_url, api_key)`` and in the config
     namespace used for the model override.
     """
@@ -1462,24 +1408,11 @@ def _build_providers() -> List[OpenRouterCompatImageProvider]:
                 ],
             },
         ),
-        OpenRouterCompatImageProvider(
-            provider_name="nous",
-            display_name="Nous Portal",
-            runtime_name="nous",
-            config_key="nous",
-            model_env_var="NOUS_IMAGE_MODEL",
-            setup_schema={
-                "name": "Nous Portal (image)",
-                "badge": "subscription",
-                "tag": "Reference-grounded image generation via Nous Portal (OpenRouter-backed)",
-                "env_vars": [],
-                "requires_nous_auth": True,
-            },
-        ),
+
     ]
 
 
 def register(ctx: Any) -> None:
-    """Register the OpenRouter + Nous Portal image gen providers."""
+    """Register the OpenRouter image gen provider."""
     for provider in _build_providers():
         ctx.register_image_gen_provider(provider)
