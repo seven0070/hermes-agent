@@ -66,6 +66,15 @@ updates:
 
 In the desktop app this is **Settings → Advanced → In-App Update Local Changes**.
 
+### Review upstream commits without merging
+
+Run `hermes update --upstream-review` to fetch and list commits on
+`NousResearch/hermes-agent` main that are not yet in this fork's `origin/main`.
+This is separate from the automatic fork update check. It does not merge,
+install, or push code. Review those changes and get approval before merging
+any of them into the fork. On a shallow checkout, the command warns that the
+history is incomplete rather than giving a misleading count.
+
 ### Preview-only: `hermes update --check`
 
 Want to know if an update is available before pulling? Run `hermes update --check` — it fetches and compares commits against `origin/main`. No files are modified, no gateway is restarted. Useful in scripts and cron jobs that gate on "is there an update".

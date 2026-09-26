@@ -32,6 +32,12 @@ def build_update_parser(subparsers, *, cmd_update: Callable) -> None:
         help="Check whether an update is available without installing anything",
     )
     update_parser.add_argument(
+        "--upstream-review",
+        action="store_true",
+        default=False,
+        help="Show commits on NousResearch/main not in this fork; never merge or install",
+    )
+    update_parser.add_argument(
         "--no-backup",
         action="store_true",
         default=False,

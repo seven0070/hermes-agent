@@ -4847,6 +4847,7 @@ _LAZY_COMMAND_EXPORTS = {
         "_branch_head_label",
         "_branch_head_suffix",
         "_cmd_update_check",
+        "_cmd_upstream_review",
         "_cmd_update_impl",
         "_cold_start_windows_gateway_after_update",
         "_dependency_sync_would_rewrite",
@@ -10079,6 +10080,13 @@ def cmd_update(args):
         print(recommended_update_command_for_method(install_method))
         sys.exit(1)
 
+    if getattr(args, "upstream_review", False):
+        if getattr(args, "check", False) or getattr(args, "branch", None):
+            print("✗ --upstream-review cannot be combined with --check or --branch.")
+            sys.exit(2)
+        _self()._cmd_upstream_review()
+        return
+
     if getattr(args, "check", False):
         # --check honors --branch so the "any new commits?" answer matches
         # what a subsequent `hermes update --branch=<x>` would actually pull.
@@ -12442,7 +12450,7 @@ def main():
             "Manage the fallback provider chain.  Fallback providers are tried "
             "in order when the primary model fails with rate-limit, overload, or "
             "connection errors.  See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/features/fallback-providers"
+            "website/docs/user-guide/features/fallback-providers.md in this fork"
         ),
     )
     fallback_subparsers = fallback_parser.add_subparsers(dest="fallback_command")
@@ -12476,7 +12484,7 @@ def main():
             "Pull API keys from an external secret manager at process startup "
             "instead of storing them in ~/.hermes/.env.  Supports Bitwarden "
             "Secrets Manager and 1Password.  See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/secrets/"
+            "website/docs/user-guide/secrets/ in this fork"
         ),
     )
     secrets_subparsers = secrets_parser.add_subparsers(dest="secrets_command")
@@ -12527,7 +12535,7 @@ def main():
             "Manage iron-proxy, the optional TLS-intercepting egress firewall "
             "that swaps proxy tokens for real API credentials before outbound "
             "requests leave a sandbox.  Disabled by default.  See: "
-            "https://hermes-agent.nousresearch.com/docs/user-guide/egress/iron-proxy"
+            "website/docs/user-guide/egress/iron-proxy.md in this fork"
         ),
     )
 

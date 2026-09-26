@@ -432,7 +432,7 @@ def _print_curator_first_run_notice() -> None:
     print("  Preview now:  hermes curator run --dry-run")
     print("  Pause it:     hermes curator pause")
     print(
-        "  Docs:         https://hermes-agent.nousresearch.com/docs/user-guide/features/curator"
+        "  Docs:         website/docs/user-guide/features/curator.md in this fork"
     )
 
 def _print_fts_optimize_available_notice() -> None:
@@ -1233,7 +1233,7 @@ def _update_via_zip(args, *, had_desktop_app_before_update: bool = False) -> boo
         print("  Your existing install was left in place.")
         print(
             "  Re-run `hermes update` to retry; if the agent won't start, "
-            "reinstall from https://hermes-agent.nousresearch.com"
+            "reinstall from https://github.com/seven0070/hermes-agent"
         )
         _m().sys.exit(1)
     finally:
@@ -2524,6 +2524,63 @@ def _run_logged_subprocess(cmd, *, cwd=None, env=None):
     )
     _log_only_write(result.stdout or "")
     return result
+
+def _cmd_upstream_review() -> None:
+    """Preview upstream commits missing from this fork; never merge or install.
+
+    This is an explicit, separate operation from the automatic fork update
+    check. Fetching updates git object storage and FETCH_HEAD, not the checkout.
+    """
+    from hermes_cli.config import detect_install_method
+
+    root = _m().PROJECT_ROOT
+    if detect_install_method(root) != "git" or not (root / ".git").exists():
+        print("✗ Upstream review needs a git source checkout.")
+        raise SystemExit(1)
+    git = ["git", "-c", "windows.appendAtomically=false"] if sys.platform == "win32" else ["git"]
+
+    def run(*args):
+        return subprocess.run(git + list(args), cwd=root, capture_output=True,
+                              text=True, encoding="utf-8", errors="replace")
+
+    origin = _get_origin_url(git, root)
+    if not origin:
+        print("✗ No origin remote; cannot identify this fork's main branch.")
+        raise SystemExit(1)
+    # Explicit review only. Never use a mutable 'upstream' remote or a URL
+    # supplied by repository contents as the comparison source.
+    upstream_url = "https://github.com/NousResearch/hermes-agent.git"
+    print("→ Fetching fork main for comparison...")
+    fork_fetch = run("fetch", "--no-tags", "origin", "main")
+    if fork_fetch.returncode or run("rev-parse", "--verify", "--quiet", "refs/remotes/origin/main").returncode:
+        print("✗ Could not fetch the fork's main branch.")
+        raise SystemExit(1)
+    print("→ Fetching upstream main for review only...")
+    upstream_fetch = run("fetch", "--no-tags", upstream_url, "main")
+    if upstream_fetch.returncode:
+        print("✗ Could not fetch upstream main. No merge was attempted.")
+        raise SystemExit(1)
+    head = run("rev-parse", "--verify", "FETCH_HEAD")
+    if head.returncode:
+        print("✗ Upstream fetch returned no commit. No merge was attempted.")
+        raise SystemExit(1)
+    sha = head.stdout.strip()
+    shallow = run("rev-parse", "--is-shallow-repository")
+    if shallow.stdout.strip() == "true":
+        print("⚠ Shallow checkout: commit list may be incomplete; do not use it to decide a merge.")
+        return
+    commits = run("log", "--format=%H %s", "--max-count=20", "refs/remotes/origin/main.." + sha)
+    count = run("rev-list", "--count", "refs/remotes/origin/main.." + sha)
+    if commits.returncode or count.returncode:
+        print("✗ Could not compare fork and upstream histories. No merge was attempted.")
+        raise SystemExit(1)
+    total = int(count.stdout.strip())
+    print(f"Upstream-only commits: {total} (showing up to 20).")
+    for line in commits.stdout.splitlines():
+        # Commit subjects are untrusted and may contain terminal control chars.
+        print("  " + "".join(c if c.isprintable() else "?" for c in line))
+    print("Review only. No upstream commits were merged or installed.")
+
 
 def _cmd_update_check(branch: str = "main", *, branch_explicit: bool = False):
     """Implement ``hermes update --check``: fetch and report without installing.
@@ -5263,7 +5320,7 @@ def _cmd_update_impl(args, gateway_mode: bool):
             print(f"  ⚠ {failing_module} still fails to import after updating:")
             print(f"      {import_error}")
             print("    Run `hermes update` again — if it persists, reinstall:")
-            print("    https://hermes-agent.nousresearch.com")
+            print("    https://github.com/seven0070/hermes-agent")
 
         node_failures = _update_node_dependencies()
         _m()._build_web_ui(_m().PROJECT_ROOT / "web")
