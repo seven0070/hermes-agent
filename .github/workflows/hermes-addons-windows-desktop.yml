@@ -1,0 +1,72 @@
+name: Hermes Addons Windows Desktop (test artifact)
+
+on:
+  push:
+    branches: [hermes-addons]
+    paths:
+      - '.github/workflows/hermes-addons-windows-desktop.yml'
+      - 'apps/desktop/**'
+      - 'package.json'
+      - 'package-lock.json'
+      - 'scripts/**'
+      - 'agent/**'
+      - 'plugins/**'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hermes-addons-windows-desktop-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-installer:
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - name: Checkout exact test branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          persist-credentials: false
+      - name: Verify test-branch source
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -ne 'hermes-addons') { throw 'Only hermes-addons may produce this installer.' }
+          Write-Host "Building commit $env:GITHUB_SHA from $env:GITHUB_REF_NAME"
+      - name: Set up Node 26
+        uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 26
+          cache: npm
+      - name: Install npm 12
+        run: npm i -g npm@12
+      - name: Install locked dependencies
+        run: npm ci
+      - name: Build Windows NSIS installer (unsigned)
+        working-directory: apps/desktop
+        env:
+          NODE_OPTIONS: --max-old-space-size=8192
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+        run: npm run dist:win:nsis -- --publish never
+      - name: Check output and hash
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem 'apps/desktop/release' -Filter '*.exe' -File)
+          if ($installers.Count -ne 1) { throw "Expected one Windows installer, found $($installers.Count)" }
+          $installers | Get-FileHash -Algorithm SHA256 | Format-Table -AutoSize
+          Get-Content 'apps/desktop/build/install-stamp.json'
+      - name: Upload Windows installer
+        id: upload-installer
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: hermes-addons-windows-nsis-${{ github.sha }}
+          path: apps/desktop/release/*.exe
+          if-no-files-found: error
+          retention-days: 14
+      - name: Write download location
+        shell: pwsh
+        env:
+          ARTIFACT_URL: ${{ steps.upload-installer.outputs.artifact-url }}
+        run: |
+          "Unsigned test build from hermes-addons at $env:GITHUB_SHA. GitHub artifact (sign in to download): $env:ARTIFACT_URL" | Out-File -FilePath $env:GITHUB_STEP_SUMMARY -Append
