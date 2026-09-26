@@ -1683,6 +1683,8 @@ def resolve_runtime_provider(
     behavior (api_mode derived from config).
     """
     requested_provider = resolve_requested_provider(requested)
+    if requested_provider == "nous":
+        raise ValueError("Nous Portal was removed; choose another model provider with `hermes model`.")
 
     # Honour ``providers.<name>.enabled: false`` for BOTH user-defined
     # custom providers and the built-in ones (openai / anthropic /
