@@ -10,12 +10,13 @@
 
 import { useStore } from '@nanostores/react'
 import { useQueryClient } from '@tanstack/react-query'
-import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef } from 'react'
+import { type CSSProperties, lazy, type ReactNode, Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useLocation, useNavigate } from 'react-router'
 
 import { graftRefreshedTailOntoBackfill } from '@/app/chat/transcript-backfill'
 import { formatRefValue } from '@/components/assistant-ui/directive-text'
 import { BootFailureOverlay } from '@/components/boot-failure-overlay'
+import { BuzzFirstRunDialog, shouldOfferBuzzFirstRun } from '@/components/buzz-first-run-dialog'
 import { ConfirmHost } from '@/components/confirm-host'
 import { DesktopInstallOverlay } from '@/components/desktop-install-overlay'
 import { FindBar } from '@/components/find-bar'
@@ -34,6 +35,7 @@ import { activateWakeIndicator } from '@/lib/wake-indicator'
 import { playWakeSound } from '@/lib/wake-sound'
 import { $billingSettingsRequest } from '@/store/billing-block'
 import { $desktopBoot } from '@/store/boot'
+import { $desktopOnboarding } from '@/store/onboarding'
 import { requestVoiceConversationStart } from '@/store/composer'
 import { $activeConnectionId } from '@/store/connections'
 import { $cronReviewRequest, setCronFocusJobId } from '@/store/cron'
@@ -165,6 +167,11 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   const location = useLocation()
   const navigate = useNavigate()
 
+  const [buzzOffer, setBuzzOffer] = useState(false)
+  const onboardingWasAlreadyConfigured = useRef(
+    (() => { try { return window.localStorage.getItem('hermes-desktop-onboarded-v1') === '1' } catch { return false } })()
+  )
+  const onboardingFlowWasVisible = useRef(false)
   const busyRef = useRef(false)
   const creatingSessionRef = useRef(false)
   // Billing recovery routes to Settings → Billing from surfaces without router
@@ -179,6 +186,12 @@ export function ContribWiring({ children }: { children: ReactNode }) {
   const actionsRef = useRef<WiringActions | null>(null)
 
   const gatewayState = useStore($gatewayState)
+  const onboarding = useStore($desktopOnboarding)
+  useEffect(() => {
+    if (onboarding.configured === false && !onboarding.manual && !onboarding.firstRunSkipped) {
+      onboardingFlowWasVisible.current = true
+    }
+  }, [onboarding.configured, onboarding.manual])
   const activeSessionId = useStore($activeSessionId)
   const billingSettingsRequest = useStore($billingSettingsRequest)
   const cronReviewRequest = useStore($cronReviewRequest)
@@ -1084,6 +1097,14 @@ export function ContribWiring({ children }: { children: ReactNode }) {
         <DesktopOnboardingOverlay
           enabled={gatewayState === 'open'}
           onCompleted={() => {
+            // Only the actual first-run completion can offer Buzz, not a
+            // later provider switch or a runtime-ready refresh on relaunch.
+            if (onboardingFlowWasVisible.current && !onboardingWasAlreadyConfigured.current && shouldOfferBuzzFirstRun() &&
+                typeof navigator !== 'undefined' && /Win/i.test(navigator.platform)) {
+              setBuzzOffer(true)
+            }
+            onboardingWasAlreadyConfigured.current = true
+            onboardingFlowWasVisible.current = false
             void refreshHermesConfig()
             void refreshCurrentModel()
             void queryClient.invalidateQueries({ queryKey: ['model-options'] })
@@ -1092,6 +1113,7 @@ export function ContribWiring({ children }: { children: ReactNode }) {
           requestGateway={requestGateway}
         />
       )}
+      <BuzzFirstRunDialog onClose={() => setBuzzOffer(false)} open={buzzOffer} />
       <ModelPickerOverlay gateway={gateway || undefined} onSelect={selectModel} profile={activeGatewayProfile} />
       <SessionPickerOverlay onResume={sessionId => openSession(sessionId, navigate)} />
       <ModelVisibilityOverlay

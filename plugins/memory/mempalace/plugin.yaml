@@ -1,0 +1,5 @@
+name: mempalace
+kind: exclusive
+version: 0.1.0
+description: Optional read-only MemPalace recall. Hermes' built-in memory stays the only writer.
+requires_env: []

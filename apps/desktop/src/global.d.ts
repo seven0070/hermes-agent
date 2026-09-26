@@ -59,6 +59,7 @@ declare global {
         sessionId: string,
         opts?: { cwd?: string; profile?: string }
       ) => Promise<{ ok: boolean; error?: string }>
+      buzzLocalSetup?: { launch: () => Promise<{ ok: boolean; error?: string }> }
       // Open a new full-chrome app window — a peer instance of the primary that
       // renders the complete app against the shared backend, so the user can run
       // multiple GUI windows at once.

@@ -1,0 +1,11 @@
+# Optional local memory, MemPalace
+
+MemPalace is preferable to claude-mem for this lightweight Windows trial: Python-based, local ChromaDB, MIT, no second Node/Bun worker. It still adds ChromaDB and a model (English MiniLM is about 30 MB); it is not zero weight. Sources: https://github.com/MemPalace/mempalace ; https://github.com/MemPalace/mempalace/blob/main/LICENSE
+
+**A bundled optional recall-only MemoryProvider now exists** at `plugins/memory/mempalace/`. It requires an explicit `MEMPALACE_PALACE_PATH`, performs searches only and never writes turns or mirrors Hermes memory. The built-in memory remains the only automatic writer. MemPalace may create its own index/cache during search; do not assume no filesystem writes.
+
+**Do not enable automatic Hermes memory writing yet.** Upstream's Hermes installer (`mempalace hermes install`) is in an open draft PR, not established as released. Its review describes duplicate/live-versus-backfill filing and provider-path issues. Source: https://github.com/MemPalace/mempalace/pull/1942
+
+Safe optional trial: install `mempalace` into an isolated `uv tool` environment (`uv tool install mempalace`), initialize a **separate** test palace and query a disposable note using the CLI. To enable Hermes recall later, also install `mempalace` in Hermes' Python venv (`uv pip install --python <Hermes venv python path> mempalace`); an isolated tool install alone is not importable by the Hermes provider. Do not point it at Hermes sessions. If you decide to enable the recall-only provider, set an explicit palace path and `memory.provider: mempalace`; do not run `mempalace hermes install` until the upstream release and on-device behavior are checked. Hermes' current built-in memory remains the only automatic writer. A provider integration should be added later only after verifying that it reads/writes one palace, preserves existing memory, backs up its state, and passes a Windows live-turn test. Review the installed package/license before enabling.
+
+claude-mem's README claims Apache-2.0, but its root LICENSE currently states AGPL-3.0; clarify before embedding. It also needs Node, Bun, an extra worker and a separate memory store. Sources: https://github.com/thedotmack/claude-mem ; https://github.com/thedotmack/claude-mem/blob/main/LICENSE

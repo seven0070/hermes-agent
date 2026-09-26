@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('hermesDesktop', {
   getAgentRoster: () => ipcRenderer.invoke('hermes:agents:roster'),
   openSessionWindow: (sessionId, opts) => ipcRenderer.invoke('hermes:window:openSession', sessionId, opts),
   openSessionInTerminal: (sessionId, opts) => ipcRenderer.invoke('hermes:window:openInTerminal', sessionId, opts),
+  buzzLocalSetup: { launch: () => ipcRenderer.invoke('hermes:buzz-local:launch') },
   openWindow: () => ipcRenderer.invoke('hermes:window:openInstance'),
   claimAmbientCue: key => ipcRenderer.invoke('hermes:ambient:claim', key),
   wakeIndicator: {

@@ -108,7 +108,9 @@ class TestRegisterTranscriptionProvider:
 
         assert mgr._plugins["bad-stt-plugin"].enabled is True
         assert transcription_registry.get_provider("not a provider") is None
-        assert transcription_registry.list_providers() == []
+        # Bundled opt-in backends may auto-register; the invalid user plugin
+        # must not add its own provider.
+        assert transcription_registry.get_provider("not a provider") is None
         assert "does not inherit from TranscriptionProvider" in caplog.text
 
         transcription_registry._reset_for_tests()

@@ -4722,10 +4722,20 @@ function Invoke-PostInstallMode {
 }
 
 function Main {
+    # Only offer Buzz on the initial interactive install, never an update,
+    # stage-driver/desktop GUI install, CI or a skipped Hermes setup.
+    $wasInstalled = Test-Path (Join-Path $InstallDir '.hermes-bootstrap-complete')
     Write-Banner
     Invoke-AllStages
     if (-not $Json) {
         Write-Completion
+        if (-not $wasInstalled -and -not $NonInteractive -and -not $SkipSetup) {
+            $buzzLauncher = Join-Path $InstallDir 'scripts\optional\Launch-BuzzLocal.ps1'
+            if (Test-Path $buzzLauncher) {
+                try { & $buzzLauncher -HermesHome $HermesHome }
+                catch { Write-Warn "Optional Buzz setup stopped: $_. Hermes install remains complete." }
+            }
+        }
     } else {
         @{ ok = $true; protocol_version = $InstallStageProtocolVersion } | ConvertTo-Json -Compress | Write-Output
     }

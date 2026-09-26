@@ -12080,6 +12080,28 @@ ipcMain.handle('hermes:window:openInstance', async () => {
 // hoping a `hermes` exists on the user's interactive PATH. Resolution only —
 // never ensureRuntime(), which would kick off a first-run install from a menu
 // click; an unresolved runtime is reported instead.
+// Launch only the bundled optional Buzz launcher, never a renderer-supplied path
+// or command. PowerShell opens a visible terminal to collect the owner's public
+// keys; no private key crosses IPC or appears in the command line.
+ipcMain.handle('hermes:buzz-local:launch', async () => {
+  if (!IS_WINDOWS) return { ok: false, error: 'Buzz local setup is Windows-only' }
+  const scriptPath = path.join(ACTIVE_HERMES_ROOT, 'scripts', 'optional', 'Launch-BuzzLocal.ps1')
+  if (!fs.existsSync(scriptPath)) return { ok: false, error: 'Buzz setup script is not installed' }
+  try {
+    const child = spawn('powershell.exe', [
+      '-NoProfile', '-NoExit', '-ExecutionPolicy', 'Bypass', '-File', scriptPath, '-HermesHome', HERMES_HOME
+    ], { detached: true, stdio: 'ignore', windowsHide: false, cwd: HERMES_HOME })
+    const launched = await new Promise<{ ok: boolean; error?: string }>(resolve => {
+      child.once('error', error => resolve({ ok: false, error: error.message }))
+      child.once('spawn', () => resolve({ ok: true }))
+    })
+    if (launched.ok) child.unref()
+    return launched
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Could not open PowerShell' }
+  }
+})
+
 ipcMain.handle('hermes:window:openInTerminal', async (_event, sessionId, opts) => {
   if (typeof sessionId !== 'string' || !sessionId.trim()) {
     return { ok: false, error: 'invalid-session-id' }

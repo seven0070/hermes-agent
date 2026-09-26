@@ -1,0 +1,7 @@
+name: moonshine-transcription
+version: 0.1.0
+kind: backend
+description: Optional offline English speech-to-text with Moonshine Voice.
+pip_dependencies:
+  - moonshine-voice
+requires_env: []
