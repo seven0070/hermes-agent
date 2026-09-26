@@ -5406,7 +5406,13 @@ class TurnRunner:
                 log_message="interim_assistant_callback scheduling error",
             )
 
-        turn_route = self._runner._resolve_turn_agent_config(ctx.message, model, runtime_kwargs)
+        turn_route = self._runner._resolve_turn_agent_config(
+            ctx.message, model, runtime_kwargs,
+            explicit_model=bool(
+                ctx.session_key and (state := self._runner._peek_session_state(ctx.session_key))
+                and state.conversation.model_override
+            ),
+        )
 
         # Per-platform skip_context_files — messaging platforms can opt out
         # of filesystem-heavy context-file discovery (SOUL.md, AGENTS.md,
@@ -8080,15 +8086,28 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
 
         return model, runtime_kwargs
 
-    def _resolve_turn_agent_config(self, user_message: str, model: str, runtime_kwargs: dict) -> dict:
-        """Build the effective model/runtime config for a single turn.
+    def _resolve_turn_agent_config(self, user_message: str, model: str, runtime_kwargs: dict, *, explicit_model: bool = False) -> dict:
+        """Build turn config after authentication/command processing, before agent construction.
 
-        Always uses the session's primary model/provider.  If `/fast` is
-        enabled and the model supports Priority Processing / Anthropic fast
-        mode, attach `request_overrides` so the API call is marked
-        accordingly.
+        Optional local advisory routing never overrides explicit /model and
+        never changes provider credentials. Any failure preserves the primary.
         """
         from hermes_cli.models import resolve_fast_mode_overrides
+        from agent.decision_swarm import choose_tier
+
+        try:
+            cfg = _load_gateway_config().get("decision_swarm") or {}
+            if choose_tier(user_message, cfg, explicit_model=explicit_model) == "fast":
+                candidate = cfg.get("fast_model", "").strip()
+                # Keep the same provider and credentials. Cross-provider
+                # routing needs separate source-of-truth resolution.
+                provider = runtime_kwargs.get("provider")
+                requested = runtime_kwargs.get("requested_provider")
+                allowed = cfg.get("fast_provider")
+                if candidate and provider and allowed == provider and requested not in {"acp", "codex", "openai-codex"}:
+                    model = candidate
+        except Exception:
+            logger.debug("decision swarm unavailable; retaining primary model", exc_info=True)
 
         runtime = {
             "api_key": runtime_kwargs.get("api_key"),
@@ -22331,7 +22350,12 @@ class GatewayRunner(GatewayAuthorizationMixin, GatewayKanbanWatchersMixin, Gatew
             )
             self._reasoning_config = reasoning_config
             self._service_tier = self._resolve_session_service_tier(source=source)
-            turn_route = self._resolve_turn_agent_config(prompt, model, runtime_kwargs)
+            turn_route = self._resolve_turn_agent_config(
+                prompt, model, runtime_kwargs, explicit_model=bool(
+                    (state := self._peek_session_state(self._session_key_for_source(source)))
+                    and state.conversation.model_override
+                ),
+            )
 
             # Enrich the prompt with image descriptions so the background
             # agent can see user-attached images (same as the main flow).

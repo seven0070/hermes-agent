@@ -1,0 +1,23 @@
+text	intent	complexity	tool_need	tier
+Hello there	conversation	simple	no	fast
+Thanks for your help	conversation	simple	no	fast
+Good morning	conversation	simple	no	fast
+Tell me a short joke	conversation	simple	no	fast
+What does this word mean: ephemeral	lookup	simple	no	fast
+Explain the difference between a list and tuple	lookup	simple	no	fast
+What is a dictionary in Python	lookup	simple	no	fast
+Define a prime number	lookup	simple	no	fast
+Can you summarize this complex architecture proposal	research	complex	yes	primary
+Find the newest release notes for this app	research	complex	yes	primary
+Search my inbox for the invoice	research	complex	yes	primary
+What time is my live flight	research	complex	yes	primary
+Check the current price on the vendor site	research	complex	yes	primary
+Investigate the security of this site	research	complex	yes	primary
+Debug the intermittent race condition in this Python project	coding	complex	yes	primary
+Implement a distributed message queue with retries	coding	complex	yes	primary
+Review the code changes and run tests	coding	complex	yes	primary
+Write an app that syncs these accounts	coding	complex	yes	primary
+Send the document to my team	research	complex	yes	primary
+Book a restaurant for tonight	research	complex	yes	primary
+Pay the bill online	research	complex	yes	primary
+Should I accept this contract	research	complex	yes	primary

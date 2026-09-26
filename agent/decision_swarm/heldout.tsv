@@ -1,0 +1,11 @@
+text	intent	complexity	tool_need	tier
+Hi there	conversation	simple	no	fast
+Tell me something funny	conversation	simple	no	fast
+Explain what recursion means	lookup	simple	no	fast
+What is a tuple in Python	lookup	simple	no	fast
+Look up the latest train timetable	research	complex	yes	primary
+Find the latest release of that package	research	complex	yes	primary
+Review my recent email	research	complex	yes	primary
+Fix the database migration error	coding	complex	yes	primary
+Can you write and test this web application	coding	complex	yes	primary
+Schedule a meeting with our team	research	complex	yes	primary

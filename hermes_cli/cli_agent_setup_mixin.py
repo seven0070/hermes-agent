@@ -297,6 +297,18 @@ class CLIAgentSetupMixin:
         API call is marked accordingly.
         """
         from hermes_cli.models import resolve_fast_mode_overrides
+        from agent.decision_swarm import choose_tier
+
+        selected_model = self.model
+        try:
+            from hermes_cli.config import load_config_readonly
+            swarm_cfg = load_config_readonly().get("decision_swarm") or {}
+            if choose_tier(user_message, swarm_cfg, explicit_model=bool(getattr(self, "_explicit_model_override", False))) == "fast":
+                candidate = swarm_cfg.get("fast_model", "").strip()
+                if candidate and self.provider and swarm_cfg.get("fast_provider") == self.provider and self.provider not in {"acp", "codex", "openai-codex"}:
+                    selected_model = candidate
+        except Exception:
+            pass  # A decision helper must never prevent a normal turn.
 
         runtime = {
             "api_key": self.api_key,
@@ -311,10 +323,10 @@ class CLIAgentSetupMixin:
             "credential_pool": getattr(self, "_credential_pool", None),
         }
         route = {
-            "model": self.model,
+            "model": selected_model,
             "runtime": runtime,
             "signature": (
-                self.model,
+                selected_model,
                 runtime["provider"],
                 runtime["requested_provider"],
                 runtime["base_url"],
