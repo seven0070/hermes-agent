@@ -1,13 +1,13 @@
 # Hermes Desktop ☤
 
 <p align="center">
-  <a href="https://github.com/NousResearch/hermes-agent/releases"><img src="https://img.shields.io/badge/Download-macOS%20%C2%B7%20Windows%20%C2%B7%20Linux-FFD700?style=for-the-badge" alt="Download"></a>
-  <a href="https://hermes-agent.nousresearch.com/docs/"><img src="https://img.shields.io/badge/Docs-hermes--agent.nousresearch.com-FFD700?style=for-the-badge" alt="Documentation"></a>
-  <a href="https://discord.gg/NousResearch"><img src="https://img.shields.io/badge/Discord-5865F2?style=for-the-badge&logo=discord&logoColor=white" alt="Discord"></a>
-  <a href="https://github.com/NousResearch/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
+  <a href="https://github.com/seven0070/hermes-agent"><img src="https://img.shields.io/badge/Source-GitHub-FFD700?style=for-the-badge" alt="Source"></a>
+  <a href="https://github.com/seven0070/hermes-agent/tree/main/website/docs"><img src="https://img.shields.io/badge/Docs-fork%20source-FFD700?style=for-the-badge" alt="Documentation"></a>
+  <a href="https://github.com/seven0070/hermes-agent/issues"><img src="https://img.shields.io/badge/Issues-GitHub-5865F2?style=for-the-badge&logo=github&logoColor=white" alt="Issues"></a>
+  <a href="https://github.com/seven0070/hermes-agent/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-green?style=for-the-badge" alt="License: MIT"></a>
 </p>
 
-**The native desktop app for [Hermes Agent](../../README.md) — the self-improving AI agent from [Nous Research](https://nousresearch.com).** Same agent, same skills, same memory as the CLI and gateway, in a polished native window — chat with streaming tool output, side-by-side previews, a file browser, voice, and settings, no terminal required. Available for **macOS, Windows, and Linux**.
+**The native desktop app for this [Hermes Agent fork](../../README.md), originally built by [Nous Research](https://nousresearch.com).** Same agent, same skills, same memory as the CLI and gateway, in a polished native window — chat with streaming tool output, side-by-side previews, a file browser, voice, and settings, no terminal required. Available for **macOS, Windows, and Linux**.
 
 <table>
 <tr><td><b>Chat with the full agent</b></td><td>Streaming responses, live tool activity, structured tool summaries, and the same conversation history as every other Hermes surface.</td></tr>
@@ -34,7 +34,7 @@ It builds and launches the GUI against your existing install — same config, ke
 
 ### Prebuilt installers
 
-Prebuilt installers are built and distributed via [the Hermes Desktop website.](https://hermes-agent.nousresearch.com/).
+No prebuilt installer is advertised for this fork yet. Build from the repository with `hermes desktop`.
 
 ---
 
@@ -231,9 +231,9 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\hermes\hermes-agent\venv"
 
 ## Community
 
-- 💬 [Discord](https://discord.gg/NousResearch)
-- 📖 [Documentation](https://hermes-agent.nousresearch.com/docs/)
-- 🐛 [Issues](https://github.com/NousResearch/hermes-agent/issues)
+- 🐛 [Issues](https://github.com/seven0070/hermes-agent/issues)
+- 📖 [Documentation](https://github.com/seven0070/hermes-agent/tree/main/website/docs)
+- 🐛 [Issues](https://github.com/seven0070/hermes-agent/issues)
 
 ---
 
@@ -241,4 +241,4 @@ Remove-Item -Recurse -Force "$env:LOCALAPPDATA\hermes\hermes-agent\venv"
 
 MIT — see [LICENSE](../../LICENSE).
 
-Built by [Nous Research](https://nousresearch.com).
+Fork maintained at [seven0070/hermes-agent](https://github.com/seven0070/hermes-agent). Original project by [Nous Research](https://nousresearch.com).
