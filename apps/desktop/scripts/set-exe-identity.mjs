@@ -64,7 +64,7 @@ async function stampExeIdentity(exe, desktopRoot = resolve(import.meta.dirname, 
     'version-string': {
       ProductName: 'Hermes',
       FileDescription: 'Hermes',
-      CompanyName: 'Nous Research',
+      CompanyName: 'Sanath Patil',
       LegalCopyright: 'Copyright (c) 2026 Nous Research'
     }
   })
