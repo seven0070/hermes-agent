@@ -72,14 +72,8 @@ hermes config get     # Inspect individual config values
 hermes setup          # Or run the full setup wizard to configure everything at once
 ```
 
-:::tip Fastest path: Nous Portal
-One subscription covers 300+ models plus the [Tool Gateway](/user-guide/features/tool-gateway) (web search, image generation, TTS, cloud browser). Skip the per-tool key juggling:
-
-```bash
-hermes setup --portal
-```
-
-That logs you in, sets Nous as your provider, and turns on the Tool Gateway in one command.
+:::tip Start with a model
+Run `hermes model` to choose a supported provider, then use `hermes tools` to configure any needed tools.
 :::
 
 :::tip Already running Hermes on another machine?

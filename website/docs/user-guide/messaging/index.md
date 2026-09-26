@@ -11,7 +11,7 @@ Chat with Hermes from Telegram, Discord, Slack, WhatsApp, Signal, SMS, Email, Ho
 For the full voice feature set — including CLI microphone mode, spoken replies in messaging, and Discord voice-channel conversations — see [Voice Mode](/user-guide/features/voice-mode) and [Use Voice Mode with Hermes](/guides/use-voice-mode-with-hermes).
 
 :::tip
-Bots need both a model provider and tool providers (TTS, web). A [Nous Portal](/integrations/nous-portal) subscription bundles all of them.
+Bots need both a configured model provider and any separate tool providers (TTS, web) they use.
 :::
 
 ## Platform Comparison

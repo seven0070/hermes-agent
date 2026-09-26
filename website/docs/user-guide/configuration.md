@@ -9,7 +9,7 @@ description: "Configure Hermes Agent — config.yaml, providers, models, API key
 All settings are stored in the `~/.hermes/` directory for easy access.
 
 :::tip Easiest path to a working `config.yaml`
-Run `hermes setup --portal` — one OAuth gets you a model provider and all four Tool Gateway tools without hand-editing YAML. Portal subscribers also get 10% off token-billed providers. See [Nous Portal](/integrations/nous-portal).
+Run `hermes model` to choose a supported model provider, then configure tools with `hermes tools`.
 :::
 
 ## Directory Structure

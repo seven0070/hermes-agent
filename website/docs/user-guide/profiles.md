@@ -29,7 +29,7 @@ That's it. `coder` is now its own Hermes profile with its own config, memory, an
 ## Creating a profile
 
 :::tip
-Quickest setup: run `hermes setup --portal` inside the new profile to wire up models + tools at once. See [Nous Portal](/integrations/nous-portal).
+For each profile, run `hermes model` to choose a supported provider and configure any needed tools separately.
 :::
 
 ### Blank profile

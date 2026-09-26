@@ -13,7 +13,7 @@ Coming from **Claude Code** or **OpenAI Codex CLI** instead? Use [`hermes import
 :::
 
 :::tip
-If your OpenClaw setup was multi-provider, `hermes setup --portal` collapses it to one OAuth — 300+ models plus the Tool Gateway in a single login. See [Nous Portal](/integrations/nous-portal).
+If your OpenClaw setup used several providers, configure a supported provider with `hermes model` and test it before adding fallbacks.
 :::
 
 ## Quick start
