@@ -24,7 +24,7 @@ By default every profile is seeded with the bundled skill catalog, and each `her
 **At install time** (applies to the default `~/.hermes` profile):
 
 ```bash
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash -s -- --no-skills
+curl -fsSL https://raw.githubusercontent.com/seven0070/hermes-agent/main/scripts/install.sh | bash -s -- --no-skills
 ```
 
 **At profile-create time** (named profiles):

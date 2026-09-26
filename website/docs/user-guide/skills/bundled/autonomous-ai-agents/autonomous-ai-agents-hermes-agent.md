@@ -61,7 +61,7 @@ Good verification targets:
 
 ```bash
 # Install (shell installer — sets up uv, Python, the venv, and the launcher)
-curl -fsSL https://hermes-agent.nousresearch.com/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/seven0070/hermes-agent/main/scripts/install.sh | bash
 
 # Interactive chat (default surface; set display.interface: tui to launch the Ink TUI instead)
 hermes
